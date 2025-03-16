@@ -1,113 +1,214 @@
-import Image from "next/image";
-import { Geist, Geist_Mono } from "next/font/google";
-
-const geistSans = Geist({
-  variable: "--font-geist-sans",
-  subsets: ["latin"],
-});
-
-const geistMono = Geist_Mono({
-  variable: "--font-geist-mono",
-  subsets: ["latin"],
-});
+import { useState, useEffect, useRef } from 'react';
+import axios from 'axios';
+import { v4 as uuidv4 } from 'uuid';
 
 export default function Home() {
-  return (
-    <div className="grid grid-rows-[20px_1fr_20px] items-center justify-items-center min-h-screen p-8 pb-20 gap-16 sm:p-20 font-[family-name:var(--font-geist-sans)]">
-      <main className="flex flex-col gap-[32px] row-start-2 items-center sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={180}
-          height={38}
-          priority
-        />
-        <ol className="list-inside list-decimal text-sm/6 text-center sm:text-left font-[family-name:var(--font-geist-mono)]">
-          <li className="mb-2 tracking-[-.01em]">
-            Get started by editing{" "}
-            <code className="bg-black/[.05] dark:bg-white/[.06] px-1 py-0.5 rounded font-[family-name:var(--font-geist-mono)] font-semibold">
-              pages/index.js
-            </code>
-            .
-          </li>
-          <li className="tracking-[-.01em]">
-            Save and see your changes instantly.
-          </li>
-        </ol>
-        <div className="flex gap-4 items-center flex-col sm:flex-row">
-          <a
-            className="rounded-full border border-solid border-transparent transition-colors flex items-center justify-center bg-foreground text-background gap-2 hover:bg-[#383838] dark:hover:bg-[#ccc] font-medium text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5 sm:w-auto"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=default-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={20}
-              height={20}
-            />
-            Deploy now
-          </a>
-          <a
-            className="rounded-full border border-solid border-black/[.08] dark:border-white/[.145] transition-colors flex items-center justify-center hover:bg-[#f2f2f2] dark:hover:bg-[#1a1a1a] hover:border-transparent font-medium text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5 w-full sm:w-auto md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=default-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Read our docs
-          </a>
+  const [video, setVideo] = useState(null);
+  const [rating, setRating] = useState(null);
+  const [sessionId, setSessionId] = useState(null);
+  const [hasStarted, setHasStarted] = useState(false);
+  const [showRating, setShowRating] = useState(false);
+  const [scaleFactor, setScaleFactor] = useState(1);
+  const ratingPanelRef = useRef(null);
+  const [isVideoLoaded, setIsVideoLoaded] = useState(false);
+  const [autoFullscreen, setAutoFullscreen] = useState(false);
+  const [videoList, setVideoList] = useState([]);
+  const [currentVideoIndex, setCurrentVideoIndex] = useState(0);
+  const videoRef = useRef(null);
+  const [isFullscreen, setIsFullscreen] = useState(false);
+
+  useEffect(() => {
+    let storedSessionId = localStorage.getItem('sessionId');
+    if (!storedSessionId) {
+      storedSessionId = uuidv4();
+      localStorage.setItem('sessionId', storedSessionId);
+    }
+    setSessionId(storedSessionId);
+  }, []);
+
+  useEffect(() => {
+      if (showRating && ratingPanelRef.current) {
+          const panelHeight = ratingPanelRef.current.offsetHeight;
+          const windowHeight = window.visualViewport ? window.visualViewport.height : document.documentElement.clientHeight;
+          if (panelHeight > windowHeight) {
+              setScaleFactor(windowHeight / panelHeight);
+          } else {
+              setScaleFactor(1);
+          }
+      }
+  }, [showRating]);
+
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+        const isMobile = /Mobi|Android|iPhone|iPad/i.test(navigator.userAgent);
+        setAutoFullscreen(isMobile);
+    }
+  }, []);
+
+  useEffect(() => {
+    const checkFullscreen = () => {
+        setIsFullscreen(document.fullscreenElement !== null);
+    };
+
+    document.addEventListener("fullscreenchange", checkFullscreen);
+    return () => {
+        document.removeEventListener("fullscreenchange", checkFullscreen);
+    };
+}, []);
+
+  const startAssessment = () => {
+    const newSessionId = uuidv4();
+    setSessionId(newSessionId);
+    setHasStarted(true);
+    setIsVideoLoaded(false);
+
+    axios.get('/api/video-list').then((res) => {
+      const shuffledVideos = res.data.videos.sort(() => Math.random() - 0.5);
+      setVideoList(shuffledVideos);
+      setCurrentVideoIndex(0);
+
+      setVideo(shuffledVideos[0]);
+      setShowRating(false);
+    });
+  };
+
+  const handleVideoEnd = () => {
+    setShowRating(true);
+  };
+
+  const handleVideoLoaded = async () => {
+    setIsVideoLoaded(true);
+    if (videoRef.current) {
+        try {
+            videoRef.current.muted = true;
+            videoRef.current.setAttribute("playsinline", "true");
+            videoRef.current.setAttribute("autoplay", "true");
+
+            const prefersReducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+            if (!prefersReducedMotion) {
+                if (autoFullscreen) {
+                    try {
+                        if (videoRef.current.requestFullscreen) {
+                            await videoRef.current.requestFullscreen();
+                        } else if (videoRef.current.mozRequestFullScreen) {
+                            await videoRef.current.mozRequestFullScreen();
+                        } else if (videoRef.current.webkitRequestFullscreen) {
+                            await videoRef.current.webkitRequestFullscreen();
+                        } else if (videoRef.current.msRequestFullscreen) {
+                            await videoRef.current.msRequestFullscreen();
+                        } else if (videoRef.current.webkitEnterFullscreen) {
+                            videoRef.current.webkitEnterFullscreen();
+                        }
+                    } catch (error) {
+                        console.error("Nie udało się przejść w tryb pełnoekranowy", error);
+                    }
+                }
+                await videoRef.current.play();
+            }
+        } catch (error) {
+            console.error("Błąd odtwarzania wideo", error);
+            videoRef.current.addEventListener("click", () => {
+                videoRef.current.muted = true;
+                videoRef.current.play();
+            }, { once: true });
+        }
+    }
+  };
+
+  const submitRating = (value) => {
+    if (!video) return;
+    setRating(value);
+    axios.post('/api/rate-video', {
+      sessionId,
+      videoName: video.split('/').pop(),
+      rating: value,
+    }).then(() => {
+      if (currentVideoIndex < videoList.length - 1) {
+        setCurrentVideoIndex(currentVideoIndex + 1);
+        setVideo(videoList[currentVideoIndex + 1]);
+        setShowRating(false);
+      } else {
+        alert('Dziękujemy za ocenę wszystkich filmów!');
+        setRating(null);
+        setHasStarted(false);
+      }
+    });
+  };
+
+  if (!hasStarted) {
+    return (
+        <div className="flex flex-col items-center justify-center h-screen m-0 p-0 bg-gray-900 bg-opacity-75 text-white">
+          <div className="backdrop-blur-md bg-white/30 p-8 rounded-xl shadow-lg text-center">
+            <h1 className="text-4xl font-extrabold text-white">Witaj!</h1>
+            <h2 className="text-lg font-medium text-white mt-2">
+              Za chwilę zobaczysz kilka sekwencji video. Twoim zadaniem jest ocenienie ich jakości.
+            </h2>
+            <label className="flex items-center justify-center mt-4 bg-white/30 p-2 rounded-lg shadow-md cursor-pointer">
+              <input
+                type="checkbox"
+                checked={autoFullscreen}
+                onChange={() => !/Mobi|Android|iPhone|iPad/i.test(navigator.userAgent) && setAutoFullscreen(!autoFullscreen)}
+                className="hidden"
+              />
+              <span className={`w-10 h-5 flex items-center bg-gray-300 rounded-full p-1 transition ${autoFullscreen ? 'bg-green-500' : 'bg-gray-400'}`}>
+                <span className={`bg-white w-4 h-4 rounded-full shadow-md transform ${autoFullscreen ? 'translate-x-5' : ''}`}></span>
+              </span>
+              <span className="ml-3 text-white font-semibold">Automatyczny tryb pełnoekranowy</span>
+            </label>
+            <button
+              onClick={startAssessment}
+              className="mt-6 px-8 py-3 bg-white/20 text-white font-bold text-lg rounded-lg shadow-lg hover:bg-white/30 transition-all"
+              disabled={isFullscreen}
+            >
+              Rozpocznij
+            </button>
+          </div>
         </div>
-      </main>
-      <footer className="row-start-3 flex gap-[24px] flex-wrap items-center justify-center">
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=default-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/file.svg"
-            alt="File icon"
-            width={16}
-            height={16}
-          />
-          Learn
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=default-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/window.svg"
-            alt="Window icon"
-            width={16}
-            height={16}
-          />
-          Examples
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org?utm_source=create-next-app&utm_medium=default-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/globe.svg"
-            alt="Globe icon"
-            width={16}
-            height={16}
-          />
-          Go to nextjs.org →
-        </a>
-      </footer>
-    </div>
+    );
+  }
+
+  return (
+      <div className="absolute top-0 left-0 w-full h-screen bg-gray-900 bg-opacity-75 text-white">
+        {!showRating && video && (
+        <video
+                ref={videoRef}
+                muted
+                playsInline
+                autoPlay
+                className="absolute top-0 left-0 w-full pointer-events-none"
+                style={{ height: window.visualViewport ? window.visualViewport.height : '100vh' }}
+                onEnded={handleVideoEnd}
+                onLoadedData={handleVideoLoaded}
+                onPause={() => videoRef.current?.play()}
+                onSeeking={(e) => e.preventDefault()}
+                onContextMenu={(e) => e.preventDefault()} // Blokuje menu kontekstowe
+            >
+              <source src={video} type="video/mp4" />
+              Twoja przeglądarka nie obsługuje tagu wideo.
+            </video>
+        )}
+        {!isVideoLoaded && <p className="text-lg font-semibold text-gray-500 mt-4">Ładowanie wideo...</p>}
+        {showRating && (
+            <div
+                ref={ratingPanelRef}
+                className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 backdrop-blur-md bg-white/30 p-6 rounded-xl shadow-lg text-center w-3/4 max-w-2xl"
+                style={{ transform: `translate(-50%, -50%) scale(${scaleFactor})` }}
+            >
+              <p className="text-xl font-semibold text-white">Oceń jakość video:</p>
+              <div className="mt-2 flex flex-col space-y-2">
+                {["Doskonała", "Dobra", "Przeciętna", "Niska", "Zła"].map((label, index) => (
+                    <button
+                        key={index}
+                        onClick={() => submitRating(5 - index)}
+                        className="px-4 py-3 rounded-lg text-white font-semibold transition-all bg-white/20 hover:bg-white/30 shadow-md"
+                        disabled={isFullscreen}
+                    >
+                      {label}
+                    </button>
+                ))}
+              </div>
+            </div>
+        )}
+      </div>
   );
 }
