@@ -16,6 +16,7 @@ export default function Home() {
   const [currentVideoIndex, setCurrentVideoIndex] = useState(0);
   const videoRef = useRef(null);
   const [isFullscreen, setIsFullscreen] = useState(false);
+  const [ratingStartTime, setRatingStartTime] = useState(null);
 
   useEffect(() => {
     let storedSessionId = localStorage.getItem('sessionId');
@@ -63,16 +64,37 @@ export default function Home() {
     setIsVideoLoaded(false);
 
     axios.get('/api/video-list').then((res) => {
-      const shuffledVideos = res.data.videos.sort(() => Math.random() - 0.5);
-      setVideoList(shuffledVideos);
-      setCurrentVideoIndex(0);
+        const shuffledVideos = res.data.videos.sort(() => Math.random() - 0.5);
+        setVideoList(shuffledVideos);
+        setCurrentVideoIndex(0);
 
-      setVideo(shuffledVideos[0]);
-      setShowRating(false);
+        // Przekazanie kolejności video do API
+        const clientInfo = {
+            userAgent: navigator.userAgent,
+            language: navigator.language,
+            platform: navigator.platform,
+            screenWidth: window.screen.width,
+            screenHeight: window.screen.height,
+            viewportWidth: window.innerWidth,
+            viewportHeight: window.innerHeight,
+            timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+        };
+        axios.post('/api/create-user', {
+            sessionId: newSessionId,
+            videoOrder: shuffledVideos,
+            clientInfo,
+            autoFullscreen: autoFullscreen ? 1 : 0
+        })
+            .then(() => {
+                setVideo(shuffledVideos[0]);
+                setShowRating(false);
+            })
+            .catch(error => console.error("Błąd podczas zapisywania użytkownika:", error));
     });
   };
 
   const handleVideoEnd = () => {
+    setRatingStartTime(Date.now()); // Zapisz czas rozpoczęcia oceny
     setShowRating(true);
   };
 
@@ -117,20 +139,30 @@ export default function Home() {
 
   const submitRating = (value) => {
     if (!video) return;
+
+    const duration = ratingStartTime ? (Date.now() - ratingStartTime) / 1000 : null; // Oblicz czas w sekundach
+
     setRating(value);
     axios.post('/api/rate-video', {
       sessionId,
       videoName: video.split('/').pop(),
       rating: value,
+      duration,
     }).then(() => {
       if (currentVideoIndex < videoList.length - 1) {
         setCurrentVideoIndex(currentVideoIndex + 1);
         setVideo(videoList[currentVideoIndex + 1]);
         setShowRating(false);
+        setRatingStartTime(null); // Zresetuj czas
       } else {
-        alert('Dziękujemy za ocenę wszystkich filmów!');
-        setRating(null);
-        setHasStarted(false);
+        // Wysłanie CURRENT_TIMESTAMP do users.end_time
+        axios.post('/api/update-end-time', { sessionId })
+            .then(() => {
+                alert('Dziękujemy za ocenę wszystkich filmów!');
+                setRating(null);
+                setHasStarted(false);
+            })
+            .catch(error => console.error("Błąd podczas zapisywania czasu zakończenia:", error));
       }
     });
   };

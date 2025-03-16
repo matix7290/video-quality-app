@@ -6,7 +6,11 @@ db.exec(`
     CREATE TABLE IF NOT EXISTS users (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         session_id TEXT UNIQUE NOT NULL,
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        auto_fullscreen BOOLEAN NOT NULL,
+        client_info TEXT NOT NULL,
+        playlist TEXT NOT NULL,
+        start_time TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        end_time TIMESTAMP DEFAULT NULL
     );
 
     CREATE TABLE IF NOT EXISTS ratings (
@@ -16,7 +20,8 @@ db.exec(`
         clip_name TEXT NOT NULL,
         vmaf INTEGER,
         rating INTEGER CHECK (rating BETWEEN 1 AND 5),
-        evaluation_time TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        duration INTEGER,
         FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
     );
 `);
