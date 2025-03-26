@@ -203,6 +203,7 @@ export default function Home() {
       <div className="absolute top-0 left-0 w-full h-screen bg-gray-900 bg-opacity-75 text-white">
         {!showRating && video && (
         <video
+        	preload="auto"
                 ref={videoRef}
                 muted
                 playsInline
