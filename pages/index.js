@@ -4,7 +4,6 @@ import {v4 as uuidv4} from 'uuid';
 
 export default function Home() {
     const [video, setVideo] = useState(null);
-    const [rating, setRating] = useState(null);
     const [sessionId, setSessionId] = useState(null);
     const [hasStarted, setHasStarted] = useState(false);
     const [showRating, setShowRating] = useState(false);
@@ -80,7 +79,6 @@ export default function Home() {
             const clientInfo = {
                 userAgent: navigator.userAgent,
                 language: navigator.language,
-                platform: navigator.platform,
                 screenWidth: window.screen.width,
                 screenHeight: window.screen.height,
                 viewportWidth: window.innerWidth,
@@ -121,7 +119,7 @@ export default function Home() {
             });
             videoRef.current.type = type;
             videoRef.current.src = URL.createObjectURL(blob);
-            handleVideoLoaded().then(r => {});
+            handleVideoLoaded().then(() => {});
         }
 
         function GET(url) {
@@ -154,14 +152,6 @@ export default function Home() {
                         try {
                             if (videoRef.current.requestFullscreen) {
                                 await videoRef.current.requestFullscreen();
-                            } else if (videoRef.current.mozRequestFullScreen) {
-                                await videoRef.current.mozRequestFullScreen();
-                            } else if (videoRef.current.webkitRequestFullscreen) {
-                                await videoRef.current.webkitRequestFullscreen();
-                            } else if (videoRef.current.msRequestFullscreen) {
-                                await videoRef.current.msRequestFullscreen();
-                            } else if (videoRef.current.webkitEnterFullscreen) {
-                                videoRef.current.webkitEnterFullscreen();
                             }
                         } catch (error) {
                             console.error("Nie udało się przejść w tryb pełnoekranowy", error);
@@ -184,7 +174,6 @@ export default function Home() {
 
         const duration = ratingStartTime ? (Date.now() - ratingStartTime) / 1000 : null; // Oblicz czas w sekundach
 
-        setRating(value);
         axios.post('/api/rate-video', {
             sessionId,
             videoName: video.split('/').pop(),
@@ -201,7 +190,6 @@ export default function Home() {
                 axios.post('/api/update-end-time', {sessionId})
                     .then(() => {
                         alert('Dziękujemy za ocenę wszystkich filmów!');
-                        setRating(null);
                         setHasStarted(false);
                     })
                     .catch(error => console.error("Błąd podczas zapisywania czasu zakończenia:", error));
