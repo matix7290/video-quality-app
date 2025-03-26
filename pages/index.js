@@ -17,6 +17,7 @@ export default function Home() {
     const videoRef = useRef(null);
     const [isFullscreen, setIsFullscreen] = useState(false);
     const [ratingStartTime, setRatingStartTime] = useState(null);
+    const [loadingProgress, setLoadingProgress] = useState(0);
 
     useEffect(() => {
         let storedSessionId = localStorage.getItem('sessionId');
@@ -57,6 +58,13 @@ export default function Home() {
         };
     }, []);
 
+    useEffect(() => {
+        if (video) {
+            setIsVideoLoaded(false);
+            loadVideo(video);
+        }
+    }, [video]);
+
     const startAssessment = () => {
         const newSessionId = uuidv4();
         setSessionId(newSessionId);
@@ -92,6 +100,40 @@ export default function Home() {
                 .catch(error => console.error("Błąd podczas zapisywania użytkownika:", error));
         });
     };
+
+    const loadVideo = (url) => {
+        GET(url);
+
+        console.log(url);
+
+        function onProgress(event) {
+            if (event.lengthComputable) {
+                let completion = (event.loaded / event.total) * 100;
+                setLoadingProgress(completion);
+                console.log(completion);
+            }
+        }
+
+        function onLoad(event) {
+            let type = 'video/mp4';
+            let blob = new Blob([event.target.response], {
+                type: type
+            });
+            videoRef.current.type = type;
+            videoRef.current.src = URL.createObjectURL(blob);
+            handleVideoLoaded().then(r => {});
+        }
+
+        function GET(url) {
+            let xhr = new XMLHttpRequest();
+            xhr.open('GET', url, true);
+            xhr.setRequestHeader('Access-Control-Allow-Origin', '*');
+            xhr.responseType = 'arraybuffer';
+            xhr.onprogress = onProgress;
+            xhr.onload = onLoad;
+            xhr.send();
+        }
+    }
 
     const handleVideoEnd = () => {
         setRatingStartTime(Date.now()); // Zapisz czas rozpoczęcia oceny
@@ -207,7 +249,6 @@ export default function Home() {
         <div className="absolute top-0 left-0 w-full h-screen bg-gray-900 bg-opacity-75 text-white">
             {!showRating && video && (
                 <video
-                    preload="auto"
                     ref={videoRef}
                     muted
                     playsInline
@@ -215,16 +256,21 @@ export default function Home() {
                     className="absolute top-0 left-0 w-full pointer-events-none"
                     style={{height: window.visualViewport ? window.visualViewport.height : '100vh'}}
                     onEnded={handleVideoEnd}
-                    onLoadedData={handleVideoLoaded}
                     onPause={() => videoRef.current?.play()}
                     onSeeking={(e) => e.preventDefault()}
                     onContextMenu={(e) => e.preventDefault()} // Blokuje menu kontekstowe
                 >
-                    <source src={video} type="video/mp4"/>
                     Twoja przeglądarka nie obsługuje tagu wideo.
                 </video>
             )}
-            {!isVideoLoaded && <p className="text-lg font-semibold text-gray-500 mt-4">Ładowanie wideo...</p>}
+            {!isVideoLoaded && (
+                <div className="absolute bottom-10 left-1/2 transform -translate-x-1/2 w-1/2 bg-gray-700 rounded-full h-4 overflow-hidden shadow-lg">
+                    <div
+                        className="bg-blue-500 h-full transition-all duration-300"
+                        style={{ width: `${loadingProgress}%` }}
+                    ></div>
+                </div>
+            )}
             {showRating && (
                 <div
                     ref={ratingPanelRef}
