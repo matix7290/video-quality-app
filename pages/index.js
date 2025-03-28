@@ -22,6 +22,7 @@ export default function Home() {
     const [nextVideoType, setNextVideoType] = useState('');
     const [playTriggered, setPlayTriggered] = useState(false);
     const [loadTriggered, setLoadTriggered] = useState(false);
+    const [endScreen, setEndScreen] = useState(false);
     const waitForLoadingRef = useRef(false);
 
     useEffect(() => {
@@ -64,7 +65,6 @@ export default function Home() {
     }, []);
 
     const loadVideo = useCallback((url, initialLoad = false) => {
-        console.log('loading...')
         setLoadingProgress(0);
         GET(url);
 
@@ -77,7 +77,7 @@ export default function Home() {
 
         function onLoad(event) {
             let type = 'video/mp4';
-            let blob = new Blob([event.target.response], { type: type });
+            let blob = new Blob([event.target.response], {type: type});
 
             setNextVideoType(type);
             setNextVideoUrl(URL.createObjectURL(blob));
@@ -123,7 +123,6 @@ export default function Home() {
             setVideoList(shuffledVideos);
             setCurrentVideoIndex(0);
 
-            // Przekazanie kolejności video do API
             const clientInfo = {
                 userAgent: navigator.userAgent,
                 language: navigator.language,
@@ -149,13 +148,11 @@ export default function Home() {
     };
 
     const handleVideoEnd = () => {
-        setRatingStartTime(Date.now()); // Zapisz czas rozpoczęcia oceny
+        setRatingStartTime(Date.now());
         setShowRating(true);
     };
 
     const handleVideoLoaded = useCallback(async (type, blob, videoElementRef = videoRef) => {
-        console.log('playing...')
-
         if (videoElementRef?.current) {
             videoElementRef.current.type = type;
             videoElementRef.current.src = blob;
@@ -212,14 +209,15 @@ export default function Home() {
     const submitRating = (value) => {
         if (!video) return;
 
-        const duration = ratingStartTime ? (Date.now() - ratingStartTime) / 1000 : null; // Oblicz czas w sekundach
+        const duration = ratingStartTime ? (Date.now() - ratingStartTime) / 1000 : null;
 
         axios.post('/api/rate-video', {
             sessionId,
             videoName: video.split('/').pop(),
             rating: value,
             duration,
-        }).then(() => {});
+        }).then(() => {
+        });
 
         setIsVideoReady(false);
 
@@ -237,55 +235,67 @@ export default function Home() {
                 waitForLoadingRef.current = true;
             }
         } else {
-            axios.post('/api/update-end-time', { sessionId })
+            axios.post('/api/update-end-time', {sessionId})
                 .then(() => {
-                    alert('Dziękujemy za ocenę wszystkich filmów!');
-                    setHasStarted(false);
+                    setEndScreen(true);
                 })
                 .catch(error => console.error("Błąd podczas zapisywania czasu zakończenia:", error));
         }
     };
 
     useEffect(() => {
-        // console.log(loadingProgress)
         if (loadTriggered) {
             setLoadTriggered(false);
-            handleVideoLoaded(nextVideoType, nextVideoUrl, videoRef).then(() => {});
+            handleVideoLoaded(nextVideoType, nextVideoUrl, videoRef).then(() => {
+            });
         }
     }, [handleVideoLoaded, loadTriggered, loadingProgress, nextVideoType, nextVideoUrl]);
 
-    if (!hasStarted) {
+    if (!hasStarted || endScreen) {
         return (
             <div
                 className="flex flex-col items-center justify-center h-screen m-0 p-0 bg-gray-900 bg-opacity-75 text-white">
                 <div className="backdrop-blur-md bg-white/30 p-8 rounded-xl shadow-lg text-center">
-                    <h1 className="text-4xl font-extrabold text-white">Witaj!</h1>
-                    <h2 className="text-lg font-medium text-white mt-2">
-                        Za chwilę zobaczysz kilka sekwencji video. Twoim zadaniem jest ocenienie ich jakości.<br/>
-                        Między sekwencjami wideo mogą pojawić się ekrany ładowania. Przy ocenie treści nie bierz ich pod uwagę.<br/>
-                    </h2>
-                    <label
-                        className="flex items-center justify-center mt-4 bg-white/30 p-2 rounded-lg shadow-md cursor-pointer">
-                        <input
-                            type="checkbox"
-                            checked={autoFullscreen}
-                            onChange={() => !/Mobi|Android|iPhone|iPad/i.test(navigator.userAgent) && setAutoFullscreen(!autoFullscreen)}
-                            className="hidden"
-                        />
-                        <span
-                            className={`w-10 h-5 flex items-center bg-gray-300 rounded-full p-1 transition ${autoFullscreen ? 'bg-green-500' : 'bg-gray-400'}`}>
-                <span
-                    className={`bg-white w-4 h-4 rounded-full shadow-md transform ${autoFullscreen ? 'translate-x-5' : ''}`}></span>
-              </span>
-                        <span className="ml-3 text-white font-semibold">Automatyczny tryb pełnoekranowy</span>
-                    </label>
-                    <button
-                        onClick={startAssessment}
-                        className="mt-6 px-8 py-3 bg-white/20 text-white font-bold text-lg rounded-lg shadow-lg hover:bg-white/30 transition-all"
-                        disabled={isFullscreen}
-                    >
-                        Rozpocznij
-                    </button>
+                    {endScreen ? (
+                        <>
+                            <h1 className="text-4xl font-extrabold text-white">Dziękujemy!</h1>
+                            <h2 className="text-lg font-medium text-white mt-2">
+                                Oceniłxś wszystkie sekwencje wideo. Dziękujemy za udział w badaniu jakości.
+                            </h2>
+                        </>
+                    ) : (
+                        <>
+                            <h1 className="text-4xl font-extrabold text-white">Witaj!</h1>
+                            <h2 className="text-lg font-medium text-white mt-2">
+                                Za chwilę zobaczysz kilka sekwencji video. Twoim zadaniem jest ocenienie ich
+                                jakości.<br/>
+                                Między sekwencjami wideo mogą pojawić się ekrany ładowania.<br/>
+                                Przy ocenie treści nie bierz ich pod uwagę.
+                            </h2>
+                            <label
+                                className="flex items-center justify-center mt-4 bg-white/30 p-2 rounded-lg shadow-md cursor-pointer">
+                                <input
+                                    type="checkbox"
+                                    checked={autoFullscreen}
+                                    onChange={() => !/Mobi|Android|iPhone|iPad/i.test(navigator.userAgent) && setAutoFullscreen(!autoFullscreen)}
+                                    className="hidden"
+                                />
+                                <span
+                                    className={`w-10 h-5 flex items-center bg-gray-300 rounded-full p-1 transition ${autoFullscreen ? 'bg-green-500' : 'bg-gray-400'}`}>
+                                    <span
+                                        className={`bg-white w-4 h-4 rounded-full shadow-md transform ${autoFullscreen ? 'translate-x-5' : ''}`}></span>
+                                </span>
+                                <span className="ml-3 text-white font-semibold">Automatyczny tryb pełnoekranowy</span>
+                            </label>
+                            <button
+                                onClick={startAssessment}
+                                className="mt-6 px-8 py-3 bg-white/20 text-white font-bold text-lg rounded-lg shadow-lg hover:bg-white/30 transition-all"
+                                disabled={isFullscreen}
+                            >
+                                Rozpocznij
+                            </button>
+                        </>
+                    )}
                 </div>
             </div>
         );
@@ -304,16 +314,17 @@ export default function Home() {
                     onEnded={handleVideoEnd}
                     onPause={() => videoRef.current?.play()}
                     onSeeking={(e) => e.preventDefault()}
-                    onContextMenu={(e) => e.preventDefault()} // Blokuje menu kontekstowe
+                    onContextMenu={(e) => e.preventDefault()}
                 >
                     Twoja przeglądarka nie obsługuje tagu wideo.
                 </video>
             )}
             {!isVideoReady && loadingProgress !== 100 && (
-                <div className="absolute bottom-10 left-1/2 transform -translate-x-1/2 w-1/2 bg-gray-700 rounded-full h-4 overflow-hidden shadow-lg">
+                <div
+                    className="absolute bottom-10 left-1/2 transform -translate-x-1/2 w-1/2 bg-gray-700 rounded-full h-4 overflow-hidden shadow-lg">
                     <div
                         className="bg-blue-500 h-full transition-all duration-300"
-                        style={{ width: `${loadingProgress}%` }}
+                        style={{width: `${loadingProgress}%`}}
                     ></div>
                 </div>
             )}
