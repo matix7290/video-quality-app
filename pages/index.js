@@ -1,4 +1,4 @@
-import {useState, useEffect, useRef} from 'react';
+import {useState, useEffect, useRef, useCallback} from 'react';
 import axios from 'axios';
 import {v4 as uuidv4} from 'uuid';
 
@@ -57,12 +57,41 @@ export default function Home() {
         };
     }, []);
 
+    const loadVideo = useCallback((url) => {
+        GET(url);
+
+        function onProgress(event) {
+            if (event.lengthComputable) {
+                let completion = (event.loaded / event.total) * 100;
+                setLoadingProgress(completion);
+            }
+        }
+
+        function onLoad(event) {
+            let type = 'video/mp4';
+            let blob = new Blob([event.target.response], { type: type });
+            videoRef.current.type = type;
+            videoRef.current.src = URL.createObjectURL(blob);
+            handleVideoLoaded().then(() => {});
+        }
+
+        function GET(url) {
+            let xhr = new XMLHttpRequest();
+            xhr.open('GET', url, true);
+            xhr.setRequestHeader('Access-Control-Allow-Origin', '*');
+            xhr.responseType = 'arraybuffer';
+            xhr.onprogress = onProgress;
+            xhr.onload = onLoad;
+            xhr.send();
+        }
+    }, [setLoadingProgress]);
+
     useEffect(() => {
         if (video) {
             setIsVideoLoaded(false);
             loadVideo(video);
         }
-    }, [video]);
+    }, [video, loadVideo]);
 
     const startAssessment = () => {
         const newSessionId = uuidv4();
@@ -98,40 +127,6 @@ export default function Home() {
                 .catch(error => console.error("Błąd podczas zapisywania użytkownika:", error));
         });
     };
-
-    const loadVideo = (url) => {
-        GET(url);
-
-        console.log(url);
-
-        function onProgress(event) {
-            if (event.lengthComputable) {
-                let completion = (event.loaded / event.total) * 100;
-                setLoadingProgress(completion);
-                console.log(completion);
-            }
-        }
-
-        function onLoad(event) {
-            let type = 'video/mp4';
-            let blob = new Blob([event.target.response], {
-                type: type
-            });
-            videoRef.current.type = type;
-            videoRef.current.src = URL.createObjectURL(blob);
-            handleVideoLoaded().then(() => {});
-        }
-
-        function GET(url) {
-            let xhr = new XMLHttpRequest();
-            xhr.open('GET', url, true);
-            xhr.setRequestHeader('Access-Control-Allow-Origin', '*');
-            xhr.responseType = 'arraybuffer';
-            xhr.onprogress = onProgress;
-            xhr.onload = onLoad;
-            xhr.send();
-        }
-    }
 
     const handleVideoEnd = () => {
         setRatingStartTime(Date.now()); // Zapisz czas rozpoczęcia oceny
