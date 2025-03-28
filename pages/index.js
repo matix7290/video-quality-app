@@ -110,7 +110,7 @@ export default function Home() {
             setPlayTriggered(false);
             loadVideo(nextVideo, false);
         }
-    }, [playTriggered, loadVideo, nextVideo, videoList])
+    }, [playTriggered, loadVideo, nextVideo, videoList, currentVideoIndex])
 
     const startAssessment = () => {
         const newSessionId = uuidv4();
@@ -219,7 +219,7 @@ export default function Home() {
             videoName: video.split('/').pop(),
             rating: value,
             duration,
-        });
+        }).then(() => {});
 
         setIsVideoReady(false);
 
