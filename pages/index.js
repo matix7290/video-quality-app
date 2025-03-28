@@ -9,7 +9,7 @@ export default function Home() {
     const [showRating, setShowRating] = useState(false);
     const [scaleFactor, setScaleFactor] = useState(1);
     const ratingPanelRef = useRef(null);
-    const [isVideoLoaded, setIsVideoLoaded] = useState(false);
+    const [isVideoReady, setIsVideoReady] = useState(false);
     const [autoFullscreen, setAutoFullscreen] = useState(false);
     const [videoList, setVideoList] = useState([]);
     const [currentVideoIndex, setCurrentVideoIndex] = useState(0);
@@ -17,6 +17,12 @@ export default function Home() {
     const [isFullscreen, setIsFullscreen] = useState(false);
     const [ratingStartTime, setRatingStartTime] = useState(null);
     const [loadingProgress, setLoadingProgress] = useState(0);
+    const [nextVideo, setNextVideo] = useState('');
+    const [nextVideoUrl, setNextVideoUrl] = useState('');
+    const [nextVideoType, setNextVideoType] = useState('');
+    const [playTriggered, setPlayTriggered] = useState(false);
+    const [loadTriggered, setLoadTriggered] = useState(false);
+    const waitForLoadingRef = useRef(false);
 
     useEffect(() => {
         let storedSessionId = localStorage.getItem('sessionId');
@@ -57,7 +63,9 @@ export default function Home() {
         };
     }, []);
 
-    const loadVideo = useCallback((url) => {
+    const loadVideo = useCallback((url, initialLoad = false) => {
+        console.log('loading...')
+        setLoadingProgress(0);
         GET(url);
 
         function onProgress(event) {
@@ -70,9 +78,13 @@ export default function Home() {
         function onLoad(event) {
             let type = 'video/mp4';
             let blob = new Blob([event.target.response], { type: type });
-            videoRef.current.type = type;
-            videoRef.current.src = URL.createObjectURL(blob);
-            handleVideoLoaded().then(() => {});
+
+            setNextVideoType(type);
+            setNextVideoUrl(URL.createObjectURL(blob));
+
+            if (initialLoad) {
+                setLoadTriggered(true);
+            }
         }
 
         function GET(url) {
@@ -87,17 +99,24 @@ export default function Home() {
     }, [setLoadingProgress]);
 
     useEffect(() => {
-        if (video) {
-            setIsVideoLoaded(false);
-            loadVideo(video);
+        if (video && video === videoList[0]) {
+            setIsVideoReady(false);
+            loadVideo(video, true);
         }
-    }, [video, loadVideo]);
+    }, [video, loadVideo, videoList]);
+
+    useEffect(() => {
+        if (nextVideo && nextVideo !== videoList[0] && playTriggered && currentVideoIndex < videoList.length - 1) {
+            setPlayTriggered(false);
+            loadVideo(nextVideo, false);
+        }
+    }, [playTriggered, loadVideo, nextVideo, videoList])
 
     const startAssessment = () => {
         const newSessionId = uuidv4();
         setSessionId(newSessionId);
         setHasStarted(true);
-        setIsVideoLoaded(false);
+        setIsVideoReady(false);
 
         axios.get('/api/video-list').then((res) => {
             const shuffledVideos = res.data.videos.sort(() => Math.random() - 0.5);
@@ -122,6 +141,7 @@ export default function Home() {
             })
                 .then(() => {
                     setVideo(shuffledVideos[0]);
+                    setNextVideo(shuffledVideos[1]);
                     setShowRating(false);
                 })
                 .catch(error => console.error("Błąd podczas zapisywania użytkownika:", error));
@@ -133,36 +153,61 @@ export default function Home() {
         setShowRating(true);
     };
 
-    const handleVideoLoaded = async () => {
-        setIsVideoLoaded(true);
-        if (videoRef.current) {
+    const handleVideoLoaded = useCallback(async (type, blob, videoElementRef = videoRef) => {
+        console.log('playing...')
+
+        if (videoElementRef?.current) {
+            videoElementRef.current.type = type;
+            videoElementRef.current.src = blob;
+        }
+
+        setIsVideoReady(true);
+        const videoEl = videoElementRef.current;
+        if (videoEl) {
             try {
-                videoRef.current.muted = true;
-                videoRef.current.setAttribute("playsinline", "true");
-                videoRef.current.setAttribute("autoplay", "true");
+                videoEl.muted = true;
+                videoEl.setAttribute("playsinline", "true");
+                videoEl.setAttribute("autoplay", "true");
 
                 const prefersReducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
                 if (!prefersReducedMotion) {
                     if (autoFullscreen) {
                         try {
-                            if (videoRef.current.requestFullscreen) {
-                                await videoRef.current.requestFullscreen();
+                            if (videoEl.requestFullscreen) {
+                                await videoEl.requestFullscreen();
                             }
                         } catch (error) {
                             console.error("Nie udało się przejść w tryb pełnoekranowy", error);
                         }
                     }
-                    await videoRef.current.play();
+
+                    const playVideo = async (videoElement) => {
+                        try {
+                            setPlayTriggered(true);
+                            await videoElement.play();
+                        } catch (err) {
+                            console.error('Błąd odtwarzania:', err);
+                        }
+                    };
+
+                    await playVideo(videoEl);
                 }
             } catch (error) {
                 console.error("Błąd odtwarzania wideo", error);
-                videoRef.current.addEventListener("click", () => {
-                    videoRef.current.muted = true;
-                    videoRef.current.play();
+                videoEl.addEventListener("click", () => {
+                    videoEl.muted = true;
+                    videoEl.play();
                 }, {once: true});
             }
         }
-    };
+    }, [autoFullscreen]);
+
+    useEffect(() => {
+        if (waitForLoadingRef.current && loadingProgress === 100) {
+            waitForLoadingRef.current = false;
+            setLoadTriggered(true);
+        }
+    }, [loadingProgress]);
 
     const submitRating = (value) => {
         if (!video) return;
@@ -174,23 +219,40 @@ export default function Home() {
             videoName: video.split('/').pop(),
             rating: value,
             duration,
-        }).then(() => {
-            if (currentVideoIndex < videoList.length - 1) {
-                setCurrentVideoIndex(currentVideoIndex + 1);
-                setVideo(videoList[currentVideoIndex + 1]);
-                setShowRating(false);
-                setRatingStartTime(null); // Zresetuj czas
-            } else {
-                // Wysłanie CURRENT_TIMESTAMP do users.end_time
-                axios.post('/api/update-end-time', {sessionId})
-                    .then(() => {
-                        alert('Dziękujemy za ocenę wszystkich filmów!');
-                        setHasStarted(false);
-                    })
-                    .catch(error => console.error("Błąd podczas zapisywania czasu zakończenia:", error));
-            }
         });
+
+        setIsVideoReady(false);
+
+        if (currentVideoIndex < videoList.length - 1) {
+            setCurrentVideoIndex(currentVideoIndex + 1);
+            setVideo(videoList[currentVideoIndex + 1]);
+            setNextVideo(videoList[currentVideoIndex + 2]);
+            setShowRating(false);
+            setRatingStartTime(null);
+            setIsVideoReady(false);
+
+            if (loadingProgress === 100) {
+                setLoadTriggered(true);
+            } else {
+                waitForLoadingRef.current = true;
+            }
+        } else {
+            axios.post('/api/update-end-time', { sessionId })
+                .then(() => {
+                    alert('Dziękujemy za ocenę wszystkich filmów!');
+                    setHasStarted(false);
+                })
+                .catch(error => console.error("Błąd podczas zapisywania czasu zakończenia:", error));
+        }
     };
+
+    useEffect(() => {
+        // console.log(loadingProgress)
+        if (loadTriggered) {
+            setLoadTriggered(false);
+            handleVideoLoaded(nextVideoType, nextVideoUrl, videoRef).then(() => {});
+        }
+    }, [handleVideoLoaded, loadTriggered, loadingProgress, nextVideoType, nextVideoUrl]);
 
     if (!hasStarted) {
         return (
@@ -199,7 +261,8 @@ export default function Home() {
                 <div className="backdrop-blur-md bg-white/30 p-8 rounded-xl shadow-lg text-center">
                     <h1 className="text-4xl font-extrabold text-white">Witaj!</h1>
                     <h2 className="text-lg font-medium text-white mt-2">
-                        Za chwilę zobaczysz kilka sekwencji video. Twoim zadaniem jest ocenienie ich jakości.
+                        Za chwilę zobaczysz kilka sekwencji video. Twoim zadaniem jest ocenienie ich jakości.<br/>
+                        Między sekwencjami wideo mogą pojawić się ekrany ładowania. Przy ocenie treści nie bierz ich pod uwagę.<br/>
                     </h2>
                     <label
                         className="flex items-center justify-center mt-4 bg-white/30 p-2 rounded-lg shadow-md cursor-pointer">
@@ -246,7 +309,7 @@ export default function Home() {
                     Twoja przeglądarka nie obsługuje tagu wideo.
                 </video>
             )}
-            {!isVideoLoaded && (
+            {!isVideoReady && loadingProgress !== 100 && (
                 <div className="absolute bottom-10 left-1/2 transform -translate-x-1/2 w-1/2 bg-gray-700 rounded-full h-4 overflow-hidden shadow-lg">
                     <div
                         className="bg-blue-500 h-full transition-all duration-300"
