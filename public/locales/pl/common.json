@@ -1,0 +1,21 @@
+{
+  "title": "Ocena jakości wideo",
+  "next": "Dalej",
+  "submit": "Zapisz",
+  "thanks": "Dziękujemy!",
+  "end_info": "Oceniłxś wszystkie sekwencje wideo. Dziękujemy za udział w badaniu",
+  "welcome": "Witaj!",
+  "instruction": "Za chwilę zobaczysz kilka sekwencji video. Twoim zadaniem jest ocenienie ich jakości.",
+  "instruction_loadings": "Między sekwencjami wideo mogą pojawić się ekrany ładowania.",
+  "instruction_scoring": "Przy ocenie treści nie bierz ich pod uwagę.",
+  "auto_fullscreen": "Automatyczny tryb pełnoekranowy",
+  "start": "Rozpocznij",
+  "video_tag_error": "Twoja przeglądarka nie obsługuje tagu wideo.",
+  "rate_quality": "Oceń jakość video:",
+  "excellent": "Doskonała",
+  "good": "Dobra",
+  "average": "Przeciętna",
+  "poor": "Niska",
+  "bad": "Zła",
+  "screentest_title": "Test ekranu"
+}

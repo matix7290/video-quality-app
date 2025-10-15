@@ -1,0 +1,21 @@
+{
+  "title": "Video Quality Assessment",
+  "next": "Next",
+  "submit": "Save",
+  "thanks": "Thank you!",
+  "end_info": "You have rated all video sequences. Thank you for participating in the study.",
+  "welcome": "Welcome!",
+  "instruction": "You'll soon see several video sequences. Your task is to assess their quality.",
+  "instruction_loadings": "Loading screens may appear between video sequences.",
+  "instruction_scoring": "Do not take them into account when evaluating content.",
+  "auto_fullscreen": "Automatic full screen mode",
+  "start": "Get started",
+  "video_tag_error": "Your browser does not support the video tag.",
+  "rate_quality": "Rate video quality:",
+  "excellent": "Excellent",
+  "good": "Good",
+  "average": "Fair",
+  "poor": "Poor",
+  "bad": "Bad",
+  "screentest_title": "Screen test"
+}
