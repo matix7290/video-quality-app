@@ -1,223 +1,200 @@
 import { useState, useRef, useEffect, useCallback } from "react";
 import axios from "axios";
-import { useRouter } from "next/router";
 import { useTranslation } from "next-i18next";
 import { serverSideTranslations } from "next-i18next/serverSideTranslations";
+import { v4 as uuidv4 } from "uuid";
 
 import StartScreen from "@/components/StartScreen";
 import ScreentestModal from "@/components/ScreentestModal";
 import VideoPlayer from "@/components/VideoPlayer";
 import RatingPanel from "@/components/RatingPanel";
-import ProgressBar from "@/components/ProgressBar";
-
-import useSessionId from "@/hooks/useSessionId";
-import useProlific from "@/hooks/useProlific";
-import useFullscreen from "@/hooks/useFullscreen";
-import useScreentestListener from "@/hooks/useScreentestListener";
-import useVideoPrefetch from "@/hooks/useVideoPrefetch";
+import Loader from "@/components/Loader";
 
 export default function Home() {
   const { t: trans } = useTranslation("common");
-  const router = useRouter();
 
-  // session + prolific
-  const sessionId = useSessionId();
-  const prolific = useProlific(router, sessionId);
+  // --- Sesja / Prolific (prosty wariant)
+  const [sessionId, setSessionId] = useState(null);
+  useEffect(() => {
+    let s = localStorage.getItem("sessionId");
+    if (!s) {
+      s = uuidv4();
+      localStorage.setItem("sessionId", s);
+    }
+    setSessionId(s);
+  }, []);
 
-  // ui / flow
-  const [isScreentestOpen, setIsScreentestOpen] = useState(false);
+  // --- Stany aplikacji
   const [hasStarted, setHasStarted] = useState(false);
-  const [autoFullscreen, setAutoFullscreen] = useState(false);
+  const [isScreentestOpen, setIsScreentestOpen] = useState(false);
   const [showRating, setShowRating] = useState(false);
   const [endScreen, setEndScreen] = useState(false);
 
-  // video flow
-  const [videoList, setVideoList] = useState([]);
-  const [currentVideoIndex, setCurrentVideoIndex] = useState(0);
-  const [video, setVideo] = useState(null);
-  const [nextVideo, setNextVideo] = useState(null);
+  // --- Źródła wideo (double-buffer)
+  const [currentSrc, setCurrentSrc] = useState(null); // to gra teraz (widoczne)
+  const [nextSrc, setNextSrc] = useState(null); // to preloadujemy w tle
+
+  // --- Pasek ładowania dla PRELOAD (ukrytego wideo)
+  const [preloadPercent, setPreloadPercent] = useState(null);
+  const [preloadReady, setPreloadReady] = useState(false);
+
+  // --- Referencje do video
+  const visibleVideoRef = useRef(null);
+  const preloadVideoRef = useRef(null);
 
   const ratingStartTime = useRef(null);
-  const videoRef = useRef(null);
 
-  // fullscreen on mobile
-  const { isFullscreen } = useFullscreen();
+  // ---- Funkcje pomocnicze ----
+  const getNextFromAPI = useCallback(
+    async (excludeId = "") => {
+      const url = `/api/random-video?sessionId=${
+        sessionId || ""
+      }&exclude=${excludeId}`;
+      const { data } = await axios.get(url, {
+        timeout: 15000,
+        headers: { "Cache-Control": "no-store" },
+      });
+      return data?.video || null;
+    },
+    [sessionId]
+  );
 
-  // preload hook (XHR -> Blob URL)
-  const {
-    progress,
-    nextBlobUrl,
-    nextMime,
-    triggerLoad,
-    readyFlag,
-    clearReadyFlag,
-    ensure,
-  } = useVideoPrefetch();
+  const hardResetVideo = (el) => {
+    if (!el) return;
+    try {
+      el.pause?.();
+      el.removeAttribute("src");
+      while (el.firstChild) el.removeChild(el.firstChild);
+      el.load();
+    } catch {}
+  };
 
-  // mobile detection once
-  useEffect(() => {
-    if (typeof window !== "undefined") {
-      const isMobile = /Mobi|Android|iPhone|iPad/i.test(navigator.userAgent);
-      setAutoFullscreen(isMobile);
-    }
-  }, []);
-
-  // screentest listener → zapis + start oceny
-  useScreentestListener(sessionId, async () => {
-    let list = videoList;
-    if (!list?.length) {
-      try {
-        const res = await axios.get("/api/video-list");
-        list = res.data.videos.sort(() => Math.random() - 0.5);
-        setVideoList(list);
-      } catch (e) {
-        console.error("Cannot fetch video list in start after screentest:", e);
-        setIsScreentestOpen(false);
-        return;
-      }
-    }
-
-    setHasStarted(true);
-    setIsScreentestOpen(false);
-    setCurrentVideoIndex(0);
-    setShowRating(false);
-    ratingStartTime.current = null;
-
-    setVideo(list[0] || null);
-    setNextVideo(list[1] || null);
-
-    // Preload pierwszego
-    if (list[0]) triggerLoad(list[0], true);
-  });
-
-  // kiedy wchodzimy na stronę – pobierz listę i zapisz „user”
-  const startAssessment = () => {
-    axios.get("/api/video-list").then((res) => {
-      const shuffled = res.data.videos.sort(() => Math.random() - 0.5);
-      setVideoList(shuffled);
-
-      const clientInfo = {
-        userAgent: navigator.userAgent,
-        language: navigator.language,
-        screenWidth: window.screen.width,
-        screenHeight: window.screen.height,
-        viewportWidth: window.innerWidth,
-        viewportHeight: window.innerHeight,
-        timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
-      };
-
-      axios
-        .post("/api/create-user", {
-          sessionId,
-          videoOrder: shuffled,
-          clientInfo,
-          autoFullscreen: autoFullscreen ? 1 : 0,
-          prolific,
-        })
-        .catch((err) => console.error("Error saving user:", err));
-    });
-
+  // --- Uruchomienie badania (po screenteście)
+  const startAssessment = async () => {
     setIsScreentestOpen(true);
   };
 
-  // po „readyFlag” wstrzykujemy src wideo
+  // Tu w prawdziwej aplikacji nasłuchujesz zamknięcia screentest i dopiero startujesz.
+  // Dla uproszczenia: kiedy modal się otworzył, zaraz go zamknij i startuj.
   useEffect(() => {
-    if (!readyFlag) return;
-    clearReadyFlag();
-    if (videoRef.current) {
-      videoRef.current.type = nextMime || "video/mp4";
-      videoRef.current.src = nextBlobUrl;
-      try {
-        videoRef.current.muted = true;
-        videoRef.current.setAttribute("playsinline", "true");
-        videoRef.current.setAttribute("autoplay", "true");
-        // mobile auto fullscreen (bez „czekania na interakcję” jeśli się da)
-        if (autoFullscreen && videoRef.current.requestFullscreen) {
-          videoRef.current.requestFullscreen().catch(() => {});
-        }
-        videoRef.current.play().catch(() => {
-          // fallback: klik wideo = play
-          videoRef.current.addEventListener(
-            "click",
-            () => {
-              videoRef.current.muted = true;
-              videoRef.current.play().catch(() => {});
-            },
-            { once: true }
-          );
-        });
-      } catch (e) {
-        console.error("Video playback error", e);
+    if (!isScreentestOpen) return;
+    (async () => {
+      setIsScreentestOpen(false);
+      setHasStarted(true);
+
+      // Pobierz PIERWSZY klip (grający) i DRUGI (do preloadu)
+      const first = await getNextFromAPI("");
+      if (!first) {
+        setEndScreen(true);
+        return;
       }
-    }
-  }, [readyFlag, nextBlobUrl, nextMime, clearReadyFlag, autoFullscreen]);
+      setCurrentSrc(first);
 
-  // start preloadu dla next video
+      const second = await getNextFromAPI(first.split("/").pop());
+      setNextSrc(second);
+    })();
+  }, [isScreentestOpen, getNextFromAPI]);
+
+  // --- PRELOAD hidden video: kiedy nextSrc się zmienia, preloaduj
   useEffect(() => {
-    if (!hasStarted || !videoList.length) return;
+    const el = preloadVideoRef.current;
+    if (!el || !nextSrc) return;
 
-    const cur = videoList[currentVideoIndex];
-    const nxt = videoList[currentVideoIndex + 1];
+    setPreloadPercent(0);
+    setPreloadReady(false);
 
-    setVideo(cur || null);
-    setNextVideo(nxt || null);
+    // Wyczyść i ustaw nowe źródło do preloadu
+    hardResetVideo(el);
+    try {
+      const source = document.createElement("source");
+      source.src = nextSrc; // BEZ cache-bustera — chcemy cache!
+      source.type = "video/mp4";
+      el.appendChild(source);
+      el.preload = "auto";
 
-    // 1) spróbuj natychmiast ustawić bieżący film z cache
-    const hadInCache = ensure(cur);
+      const onProgress = () => {
+        try {
+          if (!Number.isFinite(el.duration) || el.duration <= 0) {
+            setPreloadPercent(null); // indeterminate
+            return;
+          }
+          if (el.buffered && el.buffered.length > 0) {
+            const end = el.buffered.end(el.buffered.length - 1);
+            const ratio = Math.max(0, Math.min(1, end / el.duration));
+            setPreloadPercent(ratio * 100);
+          }
+        } catch {
+          setPreloadPercent(null);
+        }
+      };
 
-    // 2) jeśli bieżącego nie było w cache (np. wejście z pominięciem prefetchu) – pobierz go
-    if (!hadInCache && cur) triggerLoad(cur);
+      const onCanPlayThrough = () => {
+        setPreloadReady(true);
+        setPreloadPercent(100);
+      };
 
-    // 3) prefetch kolejnego (o ile istnieje)
-    if (nxt) triggerLoad(nxt);
-  }, [hasStarted, currentVideoIndex, videoList, ensure, triggerLoad]);
+      el.addEventListener("progress", onProgress);
+      el.addEventListener("loadedmetadata", onProgress);
+      el.addEventListener("canplay", onProgress);
+      el.addEventListener("canplaythrough", onCanPlayThrough, { once: true });
+      el.load();
+    } catch {
+      setPreloadPercent(null);
+    }
+  }, [nextSrc]);
 
-  const handleVideoEnd = () => {
+  // --- Zakończenie odtwarzania: pokaż rating
+  const handleEnded = () => {
     ratingStartTime.current = Date.now();
     setShowRating(true);
   };
 
-  const submitRating = useCallback(
-    (value) => {
-      if (!video) return;
-
-      const duration = ratingStartTime.current
+  // --- Po ocenie: natychmiast przełącz na preloadowane nextSrc i rozpocznij preload kolejnego
+  const submitRating = async (value) => {
+    if (!currentSrc) return;
+    const duration =
+      ratingStartTime.current != null
         ? (Date.now() - ratingStartTime.current) / 1000
         : null;
 
-      axios
-        .post("/api/rate-video", {
-          sessionId,
-          videoName: video.split("/").pop(),
-          rating: value,
-          duration,
-        })
-        .catch(() => {});
+    try {
+      await axios.post("/api/rate-video", {
+        sessionId,
+        videoName: currentSrc.split("/").pop(),
+        rating: value,
+        duration,
+      });
+    } catch {}
 
-      // kolejny klip czy koniec?
-      if (currentVideoIndex < videoList.length - 1) {
-        setCurrentVideoIndex((i) => i + 1);
-        setShowRating(false);
-        ratingStartTime.current = null;
-      } else {
-        axios
-          .post("/api/update-end-time", { sessionId })
-          .then(() => setEndScreen(true))
-          .catch((e) => console.error("Error saving end time:", e));
-      }
-    },
-    [video, sessionId, currentVideoIndex, videoList.length]
-  );
+    setShowRating(false);
+    ratingStartTime.current = null;
 
-  // ekrany „start/koniec”
+    // 1) przełącz widoczny player na nextSrc (już gotowe), więc natychmiast gra
+    if (nextSrc) setCurrentSrc(nextSrc);
+
+    // 2) pobierz kolejne do preloadu
+    const excludeId = (nextSrc || currentSrc).split("/").pop();
+    const another = await getNextFromAPI(excludeId);
+    if (another) {
+      setNextSrc(another);
+    } else {
+      // brak kolejnych — zakończ badanie
+      try {
+        await axios.post("/api/update-end-time", { sessionId });
+      } catch {}
+      setEndScreen(true);
+    }
+  };
+
+  // --- Ekrany
   if (!hasStarted || endScreen) {
     return (
       <StartScreen
         endScreen={endScreen}
         trans={trans}
-        autoFullscreen={autoFullscreen}
-        setAutoFullscreen={setAutoFullscreen}
-        isFullscreen={isFullscreen}
+        autoFullscreen={false}
+        setAutoFullscreen={() => {}}
+        isFullscreen={false}
         onStart={startAssessment}
       >
         <ScreentestModal
@@ -231,29 +208,43 @@ export default function Home() {
 
   return (
     <div className="absolute top-0 left-0 w-full h-screen bg-gray-900 bg-opacity-75 text-white">
-      {!showRating && video && (
+      {/* WIDOCZNY player */}
+      {currentSrc && (
         <VideoPlayer
-          ref={videoRef}
-          onEnded={handleVideoEnd}
+          ref={visibleVideoRef}
+          src={currentSrc}
+          onEnded={handleEnded}
           preventPauseResume
-          fillViewport
-        >
-          {trans("video_tag_error")}
-        </VideoPlayer>
+        />
       )}
 
-      {!showRating && progress < 100 && (
-        <div className="absolute bottom-10 left-1/2 -translate-x-1/2 w-1/2">
-          <ProgressBar value={progress} />
+      {/* UKRYTY player do PRELOADU kolejnego klipu */}
+      <video
+        ref={preloadVideoRef}
+        muted
+        playsInline
+        preload="auto"
+        crossOrigin="anonymous"
+        style={{ display: "none" }}
+      />
+
+      {/* Pasek ładowania: pokazuj, jeśli trwa preload następnego albo w trakcie ratingu */}
+      {(!preloadReady || showRating) && nextSrc && (
+        <div className="absolute bottom-10 left-1/2 transform -translate-x-1/2 w-1/2">
+          <Loader
+            percent={preloadPercent}
+            label={
+              showRating
+                ? trans("preloading_next", "Przygotowuję kolejny film…")
+                : trans("loading", "Ładowanie…")
+            }
+          />
         </div>
       )}
 
+      {/* Panel oceny */}
       {showRating && (
-        <RatingPanel
-          trans={trans}
-          onChoose={submitRating}
-          disabled={isFullscreen}
-        />
+        <RatingPanel trans={trans} onChoose={submitRating} disabled={false} />
       )}
     </div>
   );
