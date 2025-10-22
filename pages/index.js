@@ -105,7 +105,7 @@ export default function Home() {
 
     window.addEventListener("message", handleMessage);
     return () => window.removeEventListener("message", handleMessage);
-  }, [sessionId]);
+  }, [sessionId, startAssessmentAfterScreentest]);
 
   useEffect(() => {
     if (showRating && ratingPanelRef.current) {
@@ -225,7 +225,7 @@ export default function Home() {
     setIsScreentestOpen(true);
   };
 
-  const startAssessmentAfterScreentest = async () => {
+  const startAssessmentAfterScreentest = useCallback(async () => {
     let list = videoList;
     if (!list || list.length === 0) {
       try {
@@ -251,7 +251,7 @@ export default function Home() {
     setVideo(list[0] || null);
     setNextVideo(list[1] || null);
     setIsVideoReady(false);
-  };
+  }, [videoList]);
 
   const handleVideoEnd = () => {
     setRatingStartTime(Date.now());
