@@ -127,6 +127,7 @@ export default function Home() {
     if (videoRef.current) {
       videoRef.current.type = nextMime || "video/mp4";
       videoRef.current.src = nextBlobUrl;
+      console.log(nextBlobUrl);
       try {
         videoRef.current.muted = true;
         videoRef.current.setAttribute("playsinline", "true");
@@ -163,13 +164,14 @@ export default function Home() {
     setNextVideo(nxt || null);
 
     // 1) spróbuj natychmiast ustawić bieżący film z cache
-    const hadInCache = ensure(cur);
+    // const hadInCache = ensure(cur);
 
     // 2) jeśli bieżącego nie było w cache (np. wejście z pominięciem prefetchu) – pobierz go
-    if (!hadInCache && cur) triggerLoad(cur);
+    // if (!hadInCache && cur) triggerLoad(cur);
+    triggerLoad(cur);
 
     // 3) prefetch kolejnego (o ile istnieje)
-    if (nxt) triggerLoad(nxt);
+    // if (nxt) triggerLoad(nxt);
   }, [hasStarted, currentVideoIndex, videoList, ensure, triggerLoad]);
 
   const handleVideoEnd = () => {
@@ -200,9 +202,11 @@ export default function Home() {
         setShowRating(false);
         ratingStartTime.current = null;
       } else {
+        setEndScreen(true);
+
         axios
           .post("/api/update-end-time", { sessionId })
-          .then(() => setEndScreen(true))
+          .then(() => {})
           .catch((e) => console.error("Error saving end time:", e));
       }
     },
