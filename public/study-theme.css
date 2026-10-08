@@ -1,0 +1,23 @@
+:root {
+  --background: #111827;
+  --foreground: #ffffff;
+  --study-surface: #182235;
+  --study-inset: #111b2d;
+  --study-border: #2d394c;
+  --study-control-border: #3a4b63;
+  --study-muted: #a8b5c8;
+  --study-accent: #2563eb;
+  --study-accent-hover: #1d4ed8;
+  --study-focus: #60a5fa;
+  color-scheme: dark;
+}
+
+html,
+body {
+  background: var(--background);
+  color: var(--foreground);
+}
+
+.study-surface {
+  background: var(--background);
+}

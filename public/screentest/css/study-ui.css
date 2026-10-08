@@ -1,0 +1,28 @@
+/* Theme the surrounding UI only. Contrast patches, numbers and stars retain their measurement styles. */
+.screen-test { padding: 24px 16px; }
+.screen-test .container-narrow { background: var(--study-surface); border: 1px solid var(--study-border); border-radius: 14px; }
+.screen-test .header, .screen-test .footer { border-color: var(--study-border); }
+.screen-test .header h3 { color: #e5e7eb; font-size: 24px; font-weight: 700; letter-spacing: -.4px; }
+.screen-test .footer { color: var(--study-muted); }
+/* Keep animated targets inside their measurement patch, especially on narrow screens. */
+.screen-test .contrast-wp { position: relative; overflow: hidden; }
+.screen-test blockquote { border-color: var(--study-control-border); color: var(--study-muted); margin-top: 24px; }
+.screen-test blockquote p { font-size: 15px; line-height: 1.7; }
+.screen-test blockquote small { color: var(--study-muted); }
+.screen-test #smallestVisible > label, .screen-test #highestVisible > label { color: #cbd5e1; font-weight: 600; }
+.screen-test .btn { padding: 12px 14px; border-radius: 8px; font-size: 14px; font-weight: 600; box-shadow: none; text-shadow: none; }
+.screen-test .btn-default { color: #e2e8f0; background: var(--study-inset); border-color: var(--study-control-border); }
+.screen-test .btn-default:hover, .screen-test .btn-default:focus { color: #bfdbfe; background: #223858; border-color: var(--study-focus); }
+.screen-test .btn-group .btn-default.active { color: white; background: var(--study-accent); border-color: var(--study-accent); }
+.screen-test .btn-success { color: white; background: var(--study-accent); border-color: var(--study-accent); }
+.screen-test .btn-success:hover, .screen-test .btn-success:focus { background: var(--study-accent-hover); border-color: var(--study-accent-hover); }
+.screen-test .btn:focus-visible { outline: 2px solid var(--study-focus); outline-offset: 3px; }
+.screen-test .checkbox-error { color: #fecaca; background: #44232e; border: 1px solid #92424b; border-radius: 8px; }
+@media (max-width: 480px) {
+  .screen-test { padding: 16px 8px; }
+  .screen-test .container-narrow { padding: 20px 12px; }
+  .screen-test .btn-group { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 6px; }
+  .screen-test .btn-group::before, .screen-test .btn-group::after { display: none; }
+  .screen-test .btn-group > .btn { display: block; width: auto; float: none; margin: 0; border-radius: 6px; }
+  .screen-test .btn-group .btn { padding: 12px 2px; font-size: 12px; }
+}

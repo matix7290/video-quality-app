@@ -1,21 +1,23 @@
-export default function ScreentestModal({ open, onClose, title }) {
+export default function ScreentestModal({ open, onClose, title, saving, error, savingText }) {
   if (!open) return null;
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70">
-      <div className="bg-gray-900 rounded-xl overflow-hidden shadow-2xl w-[90vw] h-[90vh] relative">
-        <div className="flex items-center justify-between px-4 py-2 border-b border-white/10">
+    <div className="study-surface study-modal-overlay fixed inset-0 z-50 flex items-center justify-center">
+      <div className="study-modal" role="dialog" aria-modal="true" aria-label={title}>
+        <div className="study-modal-header">
           <h3 className="text-white font-semibold">{title}</h3>
           <button
             onClick={onClose}
-            className="text-white/80 hover:text-white"
+            disabled={saving}
+            className="study-modal-close"
             aria-label="Zamknij"
           >
             ✕
           </button>
         </div>
+        {saving && <p role="status" className="study-description px-4">{savingText}</p>}
+        {error && <p role="alert" className="study-error px-4">{error}</p>}
         <iframe
           src="/screentest/index.html"
-          className="w-full h-[calc(90vh-44px)]"
           title="Screen test"
         />
       </div>

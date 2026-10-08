@@ -1,0 +1,4 @@
+video_name,question,correct_answer,part
+example_vmaf_80.mp4,Czy w filmie pojawił się samochód?,tak,first
+example_vmaf_80.mp4,"Czy widoczny był człowiek, który biegł?",nie,second
+another_vmaf_60.mp4,Czy scena była nagrana na zewnątrz?,,both

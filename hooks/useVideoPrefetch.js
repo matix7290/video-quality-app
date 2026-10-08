@@ -1,4 +1,4 @@
-import { useCallback, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { getBinaryAsBlobUrl } from "@/utils/xhr";
 
 export default function useVideoPrefetch() {
@@ -6,13 +6,25 @@ export default function useVideoPrefetch() {
   const [nextBlobUrl, setNextBlobUrl] = useState("");
   const [nextMime, setNextMime] = useState("video/mp4");
   const [readyFlag, setReadyFlag] = useState(false);
+  const [loadError, setLoadError] = useState(false);
   const currentReq = useRef(null);
 
   // NOWE: cache pobranych klipów
   const cacheRef = useRef(new Map()); // key: url, val: { mime, blobUrl }
+  useEffect(() => {
+    const cache = cacheRef.current;
+    return () => {
+      currentReq.current?.abort();
+      for (const { blobUrl } of cache.values()) URL.revokeObjectURL(blobUrl);
+      cache.clear();
+    };
+  }, []);
 
   const triggerLoad = useCallback(async (url) => {
     if (!url) return;
+    currentReq.current?.abort();
+    setLoadError(false);
+    setReadyFlag(false);
     // jeśli już mamy w cache – nie pobieraj ponownie
     if (cacheRef.current.has(url)) {
       const { mime, blobUrl } = cacheRef.current.get(url);
@@ -24,7 +36,6 @@ export default function useVideoPrefetch() {
     }
 
     setProgress(0);
-    if (currentReq.current?.abort) currentReq.current.abort();
 
     const { controller, onProgress } = getBinaryAsBlobUrl({
       url,
@@ -35,11 +46,19 @@ export default function useVideoPrefetch() {
         setNextBlobUrl(blobUrl);
         setReadyFlag(true);
       },
+      onError: () => { setLoadError(true); setProgress(0); },
     });
 
     currentReq.current = controller;
     onProgress(true);
   }, []);
+
+  const retryLoad = useCallback((url) => {
+    const cached = cacheRef.current.get(url);
+    if (cached) URL.revokeObjectURL(cached.blobUrl);
+    cacheRef.current.delete(url);
+    triggerLoad(url);
+  }, [triggerLoad]);
 
   // NOWE: wymuś ustawienie src z cache, jeżeli istnieje
   const ensure = useCallback((url) => {
@@ -63,6 +82,8 @@ export default function useVideoPrefetch() {
     nextBlobUrl,
     nextMime,
     readyFlag,
+    loadError,
+    retryLoad,
     clearReadyFlag,
     // API
     triggerLoad, // pobierz (i zcache’uj) dany klip

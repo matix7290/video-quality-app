@@ -5,8 +5,8 @@ export default function handler(req, res) {
     return res.status(405).json({ error: "Method Not Allowed" });
 
   const { sessionId, payload } = req.body || {};
-  if (!sessionId) return res.status(400).json({ error: "Missing sessionId" });
-  if (!payload || typeof payload !== "object")
+  if (typeof sessionId !== 'string' || !sessionId.trim() || sessionId.length > 200) return res.status(400).json({ error: "Invalid sessionId" });
+  if (!payload || typeof payload !== "object" || Array.isArray(payload))
     return res.status(400).json({ error: "Missing payload" });
 
   const toNull = (v) =>

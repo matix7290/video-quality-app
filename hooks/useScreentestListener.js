@@ -1,28 +1,28 @@
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 import axios from "axios";
-import { v4 as uuidv4 } from "uuid";
 
 /**
  * Nasłuchuje postMessage z screentestu i:
  * - zapisuje payload na backend /api/screentest
  * - odpala callback startu oceny
  */
-export default function useScreentestListener(sessionId, onDone) {
+export default function useScreentestListener(sessionId, onDone, { onSaving, onError } = {}) {
+  const saving = useRef(false);
   useEffect(() => {
-    function handleMessage(event) {
+    async function handleMessage(event) {
+      if (event.origin !== window.location.origin || event.source !== document.querySelector('iframe')?.contentWindow) return;
       if (!event.data || event.data.type !== "SCREENTEST_RESULT") return;
-
-      axios
-        .post("/api/screentest", {
-          sessionId: sessionId || uuidv4(),
-          payload: event.data.payload,
-        })
-        .catch((err) => console.error("Error saving screentest", err));
-
-      onDone?.();
+      if (!sessionId || saving.current) return;
+      saving.current = true;
+      onSaving?.(true);
+      try {
+        await axios.post("/api/screentest", { sessionId, payload: event.data.payload });
+        onDone?.();
+      } catch { onError?.(); }
+      finally { saving.current = false; onSaving?.(false); }
     }
 
     window.addEventListener("message", handleMessage);
     return () => window.removeEventListener("message", handleMessage);
-  }, [sessionId, onDone]);
+  }, [sessionId, onDone, onSaving, onError]);
 }

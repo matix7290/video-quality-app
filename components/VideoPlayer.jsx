@@ -1,7 +1,7 @@
 import { forwardRef } from "react";
 
 const VideoPlayer = forwardRef(function VideoPlayer(
-  { onEnded, preventPauseResume = false, fillViewport = false, children },
+  { onEnded, onError, preventPauseResume = false, children },
   ref
 ) {
   return (
@@ -18,8 +18,9 @@ const VideoPlayer = forwardRef(function VideoPlayer(
             : "100vh",
       }}
       onEnded={onEnded}
+      onError={onError}
       onPause={() => {
-        if (preventPauseResume && ref?.current?.play) ref.current.play();
+        if (preventPauseResume && ref?.current && !ref.current.ended) ref.current.play().catch(() => {});
       }}
       onSeeking={(e) => e.preventDefault()}
       onContextMenu={(e) => e.preventDefault()}

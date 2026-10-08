@@ -1,6 +1,6 @@
 const Database = require("better-sqlite3");
 
-const db = new Database("video_quality.db", { verbose: console.log });
+const db = new Database("video_quality.db");
 
 db.exec(`
     CREATE TABLE IF NOT EXISTS users (
@@ -55,3 +55,55 @@ db.exec(`
 `);
 
 module.exports = db;
+
+// Additive migration preserves previously collected records.
+function addColumn(table, name, definition) {
+    if (!db.prepare(`PRAGMA table_info(${table})`).all().some(column => column.name === name)) {
+        db.exec(`ALTER TABLE ${table} ADD COLUMN ${name} ${definition}`);
+    }
+}
+addColumn('users', 'settings_snapshot', 'TEXT');
+addColumn('users', 'questions_snapshot', "TEXT NOT NULL DEFAULT '{}'");
+addColumn('ratings', 'phase', "TEXT NOT NULL DEFAULT 'standard'");
+addColumn('ratings', 'scale_type', "TEXT NOT NULL DEFAULT 'categorical'");
+addColumn('ratings', 'stimulus_type', "TEXT NOT NULL DEFAULT 'video'");
+db.exec(`
+    CREATE TABLE IF NOT EXISTS control_answers (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        rating_id INTEGER NOT NULL REFERENCES ratings(id),
+        question_id TEXT NOT NULL,
+        question TEXT NOT NULL,
+        answer INTEGER NOT NULL CHECK (answer IN (0, 1)),
+        correct_answer INTEGER,
+        is_correct INTEGER,
+        UNIQUE(rating_id, question_id)
+    );
+`);
+
+// Administrator credentials are separate from participant study records.
+db.exec(`
+    CREATE TABLE IF NOT EXISTS admin_passkeys (
+        id TEXT PRIMARY KEY,
+        rp_id TEXT NOT NULL,
+        user_handle TEXT NOT NULL,
+        public_key BLOB NOT NULL,
+        counter INTEGER NOT NULL DEFAULT 0,
+        transports TEXT NOT NULL DEFAULT '[]',
+        name TEXT NOT NULL,
+        device_type TEXT NOT NULL,
+        backed_up INTEGER NOT NULL,
+        created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        last_used_at TEXT
+    );
+    CREATE TABLE IF NOT EXISTS admin_webauthn_challenges (
+        token_hash TEXT PRIMARY KEY,
+        kind TEXT NOT NULL,
+        challenge TEXT NOT NULL,
+        origin TEXT NOT NULL,
+        rp_id TEXT NOT NULL,
+        user_handle TEXT,
+        name TEXT,
+        session_binding TEXT,
+        expires_at INTEGER NOT NULL
+    );
+`);

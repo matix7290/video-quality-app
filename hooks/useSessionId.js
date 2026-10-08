@@ -7,13 +7,10 @@ export default function useSessionId() {
   useEffect(() => {
     let stored = null;
     try {
-      stored = localStorage.getItem("sessionId");
-      if (!stored) {
-        stored = uuidv4();
-        localStorage.setItem("sessionId", stored);
-      }
+      stored = uuidv4();
+      localStorage.setItem("sessionId", stored);
     } catch {}
-    setSessionId(stored);
+    setSessionId(stored || uuidv4());
   }, []);
 
   return sessionId;
