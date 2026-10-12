@@ -1,21 +1,25 @@
 const fs = require('node:fs');
-const { catalog, readConfiguration, versionOf } = require('./study-config.cjs');
+const { catalog, readConfiguration, versionOf, studyRevision } = require('./study-config.cjs');
+const { cachedSnapshot } = require('./study-cache.cjs');
+const cachedStudy = cachedSnapshot();
 
 const { parseCsv, parseQuestions } = require('./questions.cjs');
 
 function readStudy() {
-  const files = catalog();
-  const filenames = files.map(file => file.name);
-  const configuration = readConfiguration();
-  const selected = configuration.settings.selectedVideos || files.filter(file => file.type === configuration.settings.stimulusType).map(file => file.name);
-  if (selected.some(name => !filenames.includes(name))) throw new Error('Wybrany stymulus nie jest już dostępny. Popraw wybór w panelu administratora.');
-  const allQuestions = parseQuestions(configuration.questionsCsv, filenames);
-  const questions = Object.fromEntries(Object.entries(allQuestions).filter(([name]) => selected.includes(name)));
-  const settings = { ...configuration.settings, selectedVideos: selected };
-  settings.version = versionOf({ settings, questions });
-  // Legacy sessions continue to accept the existing public URLs.
-  const configured = fs.existsSync(require('node:path').join(process.cwd(), 'config/study.json'));
-  return { videos: selected.map(name => `${configured ? '/api/stimuli' : '/videos'}/${encodeURIComponent(name)}`), questions, settings };
+  return cachedStudy(studyRevision(), () => {
+    const files = catalog();
+    const filenames = files.map(file => file.name);
+    const configuration = readConfiguration();
+    const selected = configuration.settings.selectedVideos || files.filter(file => file.type === configuration.settings.stimulusType).map(file => file.name);
+    if (selected.some(name => !filenames.includes(name))) throw new Error('Wybrany stymulus nie jest już dostępny. Popraw wybór w panelu administratora.');
+    const allQuestions = parseQuestions(configuration.questionsCsv, filenames);
+    const questions = Object.fromEntries(Object.entries(allQuestions).filter(([name]) => selected.includes(name)));
+    const settings = { ...configuration.settings, selectedVideos: selected };
+    settings.version = versionOf({ settings, questions });
+    // Legacy sessions continue to accept the existing public URLs.
+    const configured = fs.existsSync(require('node:path').join(process.cwd(), 'config/study.json'));
+    return { videos: selected.map(name => `${configured ? '/api/stimuli' : '/videos'}/${encodeURIComponent(name)}`), questions, settings };
+  });
 }
 
 function publicQuestions(questions) {

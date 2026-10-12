@@ -1,0 +1,126 @@
+{
+  "timestamp": "2026-10-09T09:19:56.373Z",
+  "environment": {
+    "platform": "darwin",
+    "arch": "arm64",
+    "cpu": "Apple M4",
+    "cores": 10,
+    "memoryGiB": 16,
+    "node": "v26.10.0",
+    "next": "15.5.27",
+    "server": "isolated Next.js production, direct loopback HTTP; Nginx and WAN excluded",
+    "media": "synthetic transfer fixtures; video decoding excluded"
+  },
+  "usersPerScenario": 100,
+  "mediaMiB": 32,
+  "peakApiRequests": 100,
+  "scenarios": [
+    {
+      "type": "video",
+      "participants": 100,
+      "seconds": 2.48,
+      "firstScale": {
+        "standard": 50,
+        "slider": 50
+      },
+      "mediaDelivery": {
+        "requests": 100,
+        "p50Ms": 1974.34,
+        "p95Ms": 2042.93,
+        "maxMs": 2050.02,
+        "bytesPerParticipant": 33554432,
+        "totalBytes": 3355443200,
+        "seconds": 2.05,
+        "aggregateMiBPerSecond": 1560.53
+      }
+    },
+    {
+      "type": "image",
+      "participants": 100,
+      "seconds": 0.33,
+      "firstScale": {
+        "standard": 50,
+        "slider": 50
+      }
+    }
+  ],
+  "api": {
+    "requests": 2802,
+    "p50Ms": 11.03,
+    "p95Ms": 31.85,
+    "maxMs": 45.25
+  },
+  "thresholds": {
+    "errors": 0,
+    "maxApiP95Ms": 500
+  },
+  "endpoints": {
+    "/api/video-list": {
+      "requests": 202,
+      "p50Ms": 19.42,
+      "p95Ms": 31.96,
+      "maxMs": 34.05
+    },
+    "welcome": {
+      "requests": 200,
+      "p50Ms": 58.79,
+      "p95Ms": 79.87,
+      "maxMs": 85.31
+    },
+    "/api/create-user": {
+      "requests": 400,
+      "p50Ms": 26.78,
+      "p95Ms": 43.26,
+      "maxMs": 45.25
+    },
+    "/api/screentest": {
+      "requests": 200,
+      "p50Ms": 11.91,
+      "p95Ms": 22.89,
+      "maxMs": 25.02
+    },
+    "/api/rate-video": {
+      "requests": 1600,
+      "p50Ms": 9.5,
+      "p95Ms": 21.02,
+      "maxMs": 32.9
+    },
+    "/api/update-end-time": {
+      "requests": 400,
+      "p50Ms": 7.54,
+      "p95Ms": 15.2,
+      "maxMs": 17.32
+    },
+    "image-download": {
+      "requests": 100,
+      "p50Ms": 12.49,
+      "p95Ms": 13.06,
+      "maxMs": 13.12
+    },
+    "/api/admin/results": {
+      "requests": 1,
+      "p50Ms": 2.37,
+      "p95Ms": 2.37,
+      "maxMs": 2.37
+    },
+    "csv-export": {
+      "requests": 2,
+      "p50Ms": 2.93,
+      "p95Ms": 4.15,
+      "maxMs": 4.15
+    }
+  },
+  "database": {
+    "journalMode": "wal",
+    "sqliteVersion": "3.53.2",
+    "integrity": "ok",
+    "sessions": 200,
+    "completed": 200,
+    "ratings": 800,
+    "answers": 800,
+    "screenTests": 200,
+    "duplicates": 0
+  },
+  "failures": [],
+  "passed": true
+}

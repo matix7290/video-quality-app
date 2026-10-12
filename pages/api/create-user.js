@@ -47,7 +47,7 @@ export default function handler(req, res) {
       const settings = { ...study.settings };
       if (settings.mode === 'both' && settings.phaseOrder === 'balanced') {
         const { count } = db.prepare(`SELECT COUNT(*) AS count FROM users
-          WHERE json_extract(settings_snapshot, '$.version') = ?
+          WHERE json_valid(settings_snapshot) AND json_extract(settings_snapshot, '$.version') = ?
           AND json_extract(settings_snapshot, '$.mode') = 'both'
           AND json_extract(settings_snapshot, '$.phaseOrder') = 'balanced'`).get(settings.version);
         settings.phaseSequence = count % 2 ? ['slider', 'standard'] : ['standard', 'slider'];
@@ -88,6 +88,10 @@ export default function handler(req, res) {
       },
     });
   } catch (error) {
+    if (error.code?.startsWith('SQLITE_BUSY')) {
+      res.setHeader('Retry-After', '1');
+      return res.status(503).json({ error: 'Database busy. Retry the same request.' });
+    }
     console.error("Error creating/updating user:", error);
     return res.status(500).json({ error: "Internal Server Error" });
   }

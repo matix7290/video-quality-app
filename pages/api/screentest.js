@@ -53,10 +53,6 @@ export default function handler(req, res) {
       reliability: payload.reliability,
     };
 
-    db.exec(
-      `CREATE UNIQUE INDEX IF NOT EXISTS idx_screentests_session ON screentests(session_id);`
-    );
-
     const bindings = Object.fromEntries(
       Object.entries(data).map(([k, v]) => [k, coerce(v)])
     );
@@ -97,6 +93,10 @@ export default function handler(req, res) {
     upsert.run(bindings);
     return res.status(201).json({ ok: true, sessionId, userId });
   } catch (err) {
+    if (err.code?.startsWith('SQLITE_BUSY')) {
+      res.setHeader('Retry-After', '1');
+      return res.status(503).json({ error: 'Database busy. Retry the same request.' });
+    }
     console.error("Error saving screentest:", err);
     return res.status(500).json({ error: "Internal Server Error" });
   }

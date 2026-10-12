@@ -42,6 +42,8 @@ yarn-error.log*
 next-env.d.ts
 
 *.db
+*.db-wal
+*.db-shm
 *.mp4
 /public/videos/*.mp4
 /public/images/*

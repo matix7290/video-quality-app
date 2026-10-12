@@ -9,11 +9,11 @@ const { questionsForPhase } = require('../utils/questions.cjs');
 const root = path.resolve(__dirname, '..');
 let directory, db, legacy;
 
-function handler(file) {
+function handler(file, database = db) {
   const source = fs.readFileSync(path.join(root, 'pages/api', file), 'utf8')
     .replace(/^import .*;\n/gm, '').replace('export default function handler', 'function handler');
   return new Function('db', 'readStudy', 'publicQuestions', 'validateResponse', 'sessionSettings', 'phases', 'questionsForPhase', `${source}; return handler;`)
-    (db, study.readStudy, study.publicQuestions, study.validateResponse, configuration.sessionSettings, configuration.phases, questionsForPhase);
+    (database, study.readStudy, study.publicQuestions, study.validateResponse, configuration.sessionSettings, configuration.phases, questionsForPhase);
 }
 function call(file, body, method = 'POST') {
   const response = { statusCode: 200, status(code) { this.statusCode = code; return this; },
@@ -79,6 +79,18 @@ test('malformed session requests are rejected without database binding errors', 
   for (const sessionId of [undefined, null, [], {}, 42, ' ']) {
     assert.equal(call('update-end-time.js', sessionId === undefined ? null : { sessionId }).statusCode, 400);
     assert.equal(call('screentest.js', { sessionId, payload: {} }).statusCode, 400);
+  }
+});
+
+test('participant APIs return retryable 503 responses when the database is locked', () => {
+  const busyDb = { prepare() { throw Object.assign(new Error('locked'), { code: 'SQLITE_BUSY' }); } };
+  const body = { sessionId: 'busy-session', videoOrder: [], clientInfo: {}, payload: {} };
+  for (const file of ['create-user.js', 'rate-video.js', 'update-end-time.js', 'screentest.js']) {
+    const headers = {};
+    const res = { statusCode: 200, setHeader(name, value) { headers[name] = value; },
+      status(code) { this.statusCode = code; return this; }, json(body) { this.body = body; } };
+    handler(file, busyDb)({ method: 'POST', body }, res);
+    assert.equal(res.statusCode, 503); assert.equal(headers['Retry-After'], '1');
   }
 });
 test('two-stage session saves decimals and answers atomically, supports retry, and ends only after both parts', () => {

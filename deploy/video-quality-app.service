@@ -1,0 +1,22 @@
+# Linux/systemd example. Adjust the user, checkout and Node.js binary paths.
+[Unit]
+Description=Video quality study
+After=network.target
+
+[Service]
+Type=simple
+User=study
+Group=study
+WorkingDirectory=/srv/video-quality-app
+Environment=NODE_ENV=production
+Environment=PORT=3000
+ExecStart=/usr/bin/node /srv/video-quality-app/scripts/start-production.cjs
+Restart=on-failure
+RestartSec=5
+KillMode=control-group
+LimitNOFILE=8192
+UMask=0027
+NoNewPrivileges=true
+
+[Install]
+WantedBy=multi-user.target

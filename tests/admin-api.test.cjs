@@ -4,6 +4,7 @@ const fs = require('node:fs');
 const path = require('node:path');
 const os = require('node:os');
 const { PassThrough } = require('node:stream');
+const { streamResultsCsv } = require('../utils/results-csv.cjs');
 const multer = require('multer');
 const { requireAdmin } = require('../utils/admin-auth.cjs');
 const { stimulusInfo, validStimulusHeader } = require('../utils/stimuli.cjs');
@@ -15,8 +16,10 @@ function load(file, bindings) {
   return new Function(...Object.keys(bindings), `${source}; return handler;`)(...Object.values(bindings));
 }
 function response() {
-  return { statusCode: 200, headers: {}, setHeader(name, value) { this.headers[name] = value; },
-    status(code) { this.statusCode = code; return this; }, json(body) { this.body = body; return this; }, send(body) { this.body = body; return this; } };
+  const stream = new PassThrough();
+  stream.on('data', chunk => { stream.body = (stream.body || '') + chunk.toString(); });
+  return Object.assign(stream, { statusCode: 200, headers: {}, setHeader(name, value) { this.headers[name] = value; },
+    status(code) { this.statusCode = code; return this; }, json(body) { this.body = body; return this; }, send(body) { this.body = body; return this; } });
 }
 function local() { return { method: 'GET', headers: { host: 'localhost:3000' }, socket: { remoteAddress: '127.0.0.1' }, cookies: {} }; }
 before(() => { directory = fs.mkdtempSync(path.join(os.tmpdir(), 'video-admin-api-')); process.chdir(directory); fs.mkdirSync('public/videos', { recursive: true }); });
@@ -43,7 +46,7 @@ test('video endpoint supports ranges and rejects traversal and invalid ranges', 
   const handler = load('stimuli/[name].js', { fs, path, stimulusInfo });
   async function request(name, range) {
     const req = { method: 'GET', query: { name }, headers: range ? { range } : {} };
-    const res = Object.assign(new PassThrough(), response()); const chunks = [];
+    const res = response(); const chunks = [];
     res.on('data', chunk => chunks.push(chunk));
     const done = new Promise(resolve => res.on('end', resolve));
     handler(req, res); await done; return { ...res, data: Buffer.concat(chunks) };
@@ -55,22 +58,22 @@ test('video endpoint supports ranges and rejects traversal and invalid ranges', 
   assert.equal((await request('../fixture.mp4')).statusCode, 404);
   assert.equal((await request('missing.mp4')).statusCode, 404);
 });
-test('result exports require administrator access and filter completed sessions without changing data', () => {
+test('result exports require administrator access and filter completed sessions without changing data', async () => {
   db = require('../database');
   const insert = db.prepare('INSERT INTO users (session_id, auto_fullscreen, client_info, playlist, settings_snapshot, end_time) VALUES (?, 0, ?, ?, ?, ?)');
   const first = insert.run('complete', '{}', '[]', '{"version":"v1"}', '2026-10-07').lastInsertRowid;
   const second = insert.run('incomplete', '{}', '[]', '{"version":"v2"}', null).lastInsertRowid;
   db.prepare('INSERT INTO ratings (user_id, video_name, clip_name, rating, duration) VALUES (?, ?, ?, 4, 1)').run(first, '=danger.mp4', 'clip');
   db.prepare('INSERT INTO ratings (user_id, video_name, clip_name, rating, duration) VALUES (?, ?, ?, 4, 1)').run(second, 'normal.mp4', 'clip');
-  const handler = load('admin/results.js', { db, requireAdmin });
-  let res = response(); handler({ ...local(), query: { type: 'ratings', complete: '1' } }, res);
+  const handler = load('admin/results.js', { db, requireAdmin, streamResultsCsv });
+  let res = response(); await handler({ ...local(), query: { type: 'ratings', complete: '1' } }, res);
   assert.equal(res.statusCode, 200); assert.match(res.body, /study_version/); assert.match(res.body, /complete/); assert.doesNotMatch(res.body, /incomplete/); assert.match(res.body, /'=danger.mp4/);
-  res = response(); handler({ ...local(), query: {} }, res); assert.deepEqual(res.body, { sessions: 2, completed: 1, ratings: 2, answers: 0 });
-  res = response(); handler({ ...local(), socket: { remoteAddress: '192.0.2.1' }, query: {} }, res); assert.equal(res.statusCode, 401);
+  res = response(); await handler({ ...local(), query: {} }, res); assert.deepEqual(res.body, { sessions: 2, completed: 1, ratings: 2, answers: 0 });
+  res = response(); await handler({ ...local(), socket: { remoteAddress: '192.0.2.1' }, query: {} }, res); assert.equal(res.statusCode, 401);
   assert.equal(db.prepare('SELECT COUNT(*) AS n FROM ratings').get().n, 2);
 });
 
-test('exports identify actual scale positions for slider-first and legacy sessions', () => {
+test('exports identify actual scale positions for slider-first and legacy sessions', async () => {
   const id = db.prepare('INSERT INTO users (session_id, auto_fullscreen, client_info, playlist, settings_snapshot) VALUES (?, 0, ?, ?, ?)')
     .run('reversed', '{}', '[]', JSON.stringify({ version: 'v3', mode: 'both', phaseOrder: 'balanced', phaseSequence: ['slider', 'standard'] })).lastInsertRowid;
   const insert = db.prepare('INSERT INTO ratings (user_id, video_name, clip_name, phase, scale_type, rating, duration) VALUES (?, ?, ?, ?, ?, 4, 1)');
@@ -79,8 +82,8 @@ test('exports identify actual scale positions for slider-first and legacy sessio
     db.prepare('INSERT INTO control_answers (rating_id, question_id, question, answer) VALUES (?, ?, ?, ?)')
       .run(rating.lastInsertRowid, 'q1', 'Powtórzone pytanie?', phase === 'slider' ? 1 : 0);
   }
-  const handler = load('admin/results.js', { db, requireAdmin });
-  const res = response(); handler({ ...local(), query: { type: 'ratings' } }, res);
+  const handler = load('admin/results.js', { db, requireAdmin, streamResultsCsv });
+  const res = response(); await handler({ ...local(), query: { type: 'ratings' } }, res);
   const { parseCsv } = require('../utils/study.cjs');
   const [header, ...rows] = parseCsv(res.body);
   const field = (row, key) => row[header.indexOf(key)];
@@ -88,7 +91,7 @@ test('exports identify actual scale positions for slider-first and legacy sessio
   assert.deepEqual(reversed.map(row => [field(row, 'phase'), field(row, 'first_phase'), field(row, 'phase_position')]), [['slider', 'slider', '1'], ['standard', 'slider', '2']]);
   assert.equal(field(rows[0], 'first_phase'), 'standard');
   assert.equal(field(rows[0], 'phase_position'), '1');
-  const answerResponse = response(); handler({ ...local(), query: { type: 'answers' } }, answerResponse);
+  const answerResponse = response(); await handler({ ...local(), query: { type: 'answers' } }, answerResponse);
   const [answerHeader, ...answerRows] = parseCsv(answerResponse.body);
   assert.deepEqual(answerRows.map(row => ['question_id', 'phase_position', 'phase', 'scale_type', 'answer'].map(key => row[answerHeader.indexOf(key)])), [
     ['q1', '1', 'slider', 'continuous', '1'], ['q1', '2', 'standard', 'categorical', '0'],
@@ -125,7 +128,7 @@ test('image endpoint serves original bytes with the correct MIME type and reject
   const handler = load('stimuli/[name].js', { fs, path, stimulusInfo });
   async function request(name, method = 'GET') {
     const req = { method, query: { name }, headers: {} };
-    const res = Object.assign(new PassThrough(), response()); const chunks = [];
+    const res = response(); const chunks = [];
     res.on('data', chunk => chunks.push(chunk));
     const done = new Promise(resolve => res.on('end', resolve));
     handler(req, res); await done; return { ...res, data: Buffer.concat(chunks) };
@@ -141,15 +144,15 @@ test('image endpoint serves original bytes with the correct MIME type and reject
   assert.equal((await request('link.png')).statusCode, 404);
 });
 
-test('rating and answer exports identify image stimuli while preserving historical filename columns', () => {
+test('rating and answer exports identify image stimuli while preserving historical filename columns', async () => {
   const user = db.prepare("INSERT INTO users (session_id, auto_fullscreen, client_info, playlist, settings_snapshot, end_time) VALUES ('image-export', 0, '{}', '[]', ?, '2026-10-08')")
     .run(JSON.stringify({ mode: 'standard', stimulusType: 'image', version: 'image-v1' })).lastInsertRowid;
   const rating = db.prepare("INSERT INTO ratings (user_id, video_name, clip_name, rating, phase, stimulus_type) VALUES (?, 'photo.png', 'photo', 4, 'standard', 'image')").run(user).lastInsertRowid;
   db.prepare("INSERT INTO control_answers (rating_id, question_id, question, answer) VALUES (?, 'q1', 'Pytanie?', 1)").run(rating);
-  const handler = load('admin/results.js', { db, requireAdmin });
+  const handler = load('admin/results.js', { db, requireAdmin, streamResultsCsv });
   const { parseCsv } = require('../utils/questions.cjs');
   for (const type of ['ratings', 'answers']) {
-    const res = response(); handler({ ...local(), query: { type, complete: '1' } }, res);
+    const res = response(); await handler({ ...local(), query: { type, complete: '1' } }, res);
     const [header, ...rows] = parseCsv(res.body);
     const row = rows.find(row => row[header.indexOf('session_id')] === 'image-export');
     assert.equal(row[header.indexOf('stimulus_type')], 'image');

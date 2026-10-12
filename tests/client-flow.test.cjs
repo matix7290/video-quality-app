@@ -17,7 +17,7 @@ function xhrFixture() {
     (FakeXHR, { createObjectURL() { created++; return 'blob:test'; } }, Blob);
   const progress = [];
   const request = getBinary({ url: '/api/stimuli/clip.mp4', onProgress: value => progress.push(value),
-    onDone: value => { finished++; assert.deepEqual(value, { mime: 'video/mp4', blobUrl: 'blob:test' }); }, onError: () => failed++ });
+    onDone: value => { finished++; assert.deepEqual(value, { mime: 'video/mp4', blobUrl: 'blob:test', size: 4 }); }, onError: () => failed++ });
   request.onProgress(true);
   return { xhr, request, progress, counts: () => ({ created, finished, failed }) };
 }

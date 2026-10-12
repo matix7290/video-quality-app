@@ -4,6 +4,13 @@ const crypto = require('node:crypto');
 const { phases } = require('./study-phases.cjs');
 const { stimulusInfo } = require('./stimuli.cjs');
 const { adaptStudyTexts } = require('./study-texts.cjs');
+const { revision, cachedSnapshot } = require('./study-cache.cjs');
+const cachedCatalog = cachedSnapshot();
+const cachedConfiguration = cachedSnapshot();
+let configurationGeneration = 0;
+function studyRevision() {
+  return revision(['public/videos', 'public/images', 'config/study.json', 'config/control-questions.csv']) + configurationGeneration;
+}
 const dictionaries = {
   pl: require('../public/locales/pl/common.json'),
   en: require('../public/locales/en/common.json'),
@@ -27,13 +34,13 @@ function defaults() {
   };
 }
 function catalog(type) {
-  return ['videos', 'images'].flatMap(folder => {
+  return cachedCatalog(revision(['public/videos', 'public/images']), () => ['videos', 'images'].flatMap(folder => {
     const directory = path.join(process.cwd(), 'public', folder);
     if (!fs.existsSync(directory)) return [];
     return fs.readdirSync(directory, { withFileTypes: true }).filter(entry => entry.isFile() && stimulusInfo(entry.name)?.directory === folder)
       .map(entry => ({ name: entry.name, type: stimulusInfo(entry.name).type, size: fs.statSync(path.join(directory, entry.name)).size,
         url: `/api/stimuli/${encodeURIComponent(entry.name)}` }));
-  }).filter(file => !type || file.type === type).sort((a, b) => a.name.localeCompare(b.name));
+  }).sort((a, b) => a.name.localeCompare(b.name))).filter(file => !type || file.type === type);
 }
 function validateConfig(input, filenames) {
   if (!input || typeof input !== 'object') throw new Error('Brak konfiguracji.');
@@ -77,14 +84,16 @@ function validateConfig(input, filenames) {
   return settings;
 }
 function readConfiguration() {
-  const files = catalog();
-  const location = path.join(process.cwd(), 'config/study.json');
-  if (fs.existsSync(location)) {
-    const saved = JSON.parse(fs.readFileSync(location, 'utf8'));
-    return { settings: validateConfig(saved.settings, [...files.map(file => file.name), ...(saved.settings?.selectedVideos || [])]), questionsCsv: saved.questionsCsv };
-  }
-  const csvPath = path.join(process.cwd(), 'config/control-questions.csv');
-  return { settings: defaults(), questionsCsv: fs.existsSync(csvPath) ? fs.readFileSync(csvPath, 'utf8') : 'video_name,question,correct_answer\n' };
+  return cachedConfiguration(studyRevision(), () => {
+    const files = catalog();
+    const location = path.join(process.cwd(), 'config/study.json');
+    if (fs.existsSync(location)) {
+      const saved = JSON.parse(fs.readFileSync(location, 'utf8'));
+      return { settings: validateConfig(saved.settings, [...files.map(file => file.name), ...(saved.settings?.selectedVideos || [])]), questionsCsv: saved.questionsCsv };
+    }
+    const csvPath = path.join(process.cwd(), 'config/control-questions.csv');
+    return { settings: defaults(), questionsCsv: fs.existsSync(csvPath) ? fs.readFileSync(csvPath, 'utf8') : 'video_name,question,correct_answer\n' };
+  });
 }
 function versionOf(value) { return crypto.createHash('sha256').update(JSON.stringify(value)).digest('hex').slice(0, 12); }
 function writeConfiguration(settings, questionsCsv) {
@@ -94,6 +103,7 @@ function writeConfiguration(settings, questionsCsv) {
   try {
     fs.writeFileSync(temp, JSON.stringify({ settings, questionsCsv }, null, 2) + '\n', { flag: 'wx' });
     fs.renameSync(temp, path.join(directory, 'study.json'));
+    configurationGeneration++;
   } finally { if (fs.existsSync(temp)) fs.unlinkSync(temp); }
 }
 function sessionSettings(user) {
@@ -102,4 +112,4 @@ function sessionSettings(user) {
   return { ...settings, stimulusType: settings.stimulusType ?? 'video', imageDuration: settings.imageDuration ?? 5,
     autoFullscreen: user.settings_snapshot && typeof settings.autoFullscreen === 'boolean' ? settings.autoFullscreen : !!user.auto_fullscreen };
 }
-module.exports = { defaults, catalog, validateConfig, readConfiguration, phases, versionOf, writeConfiguration, sessionSettings, TEXT_KEYS };
+module.exports = { defaults, catalog, validateConfig, readConfiguration, phases, versionOf, writeConfiguration, sessionSettings, TEXT_KEYS, studyRevision };

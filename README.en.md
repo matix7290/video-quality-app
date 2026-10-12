@@ -29,6 +29,14 @@ Place MP4 videos in `public/videos` and JPG/PNG/WebP images in `public/images`, 
 import them through the administrator panel. Run `npm run build`, `npm run lint`
 and `npm test` to check compilation, code, CSV import, migrations and response storage.
 
+## Production and 100 simultaneous participants
+
+For a production setup with 100 simultaneous participants, see the
+[deployment guide](docs/deployment.en.md). It includes Nginx media delivery,
+the `npm run start:production` entry point, an isolated `npm run test:load`
+benchmark and `npm run db:backup`. Reference measurements are recorded in the
+[100-participant verification report](docs/performance-100-2026-10-09.md).
+
 ## Videos or images as stimuli
 
 In **Administrator panel → Stimuli → Stimulus type**

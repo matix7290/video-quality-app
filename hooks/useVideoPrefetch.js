@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { getBinaryAsBlobUrl } from "@/utils/xhr";
+import { BlobCache } from "@/utils/blob-cache.cjs";
 
 export default function useVideoPrefetch() {
   const [progress, setProgress] = useState(0);
@@ -9,13 +10,12 @@ export default function useVideoPrefetch() {
   const [loadError, setLoadError] = useState(false);
   const currentReq = useRef(null);
 
-  // NOWE: cache pobranych klipów
-  const cacheRef = useRef(new Map()); // key: url, val: { mime, blobUrl }
+  const cacheRef = useRef(null);
+  if (!cacheRef.current) cacheRef.current = new BlobCache(url => URL.revokeObjectURL(url));
   useEffect(() => {
     const cache = cacheRef.current;
     return () => {
       currentReq.current?.abort();
-      for (const { blobUrl } of cache.values()) URL.revokeObjectURL(blobUrl);
       cache.clear();
     };
   }, []);
@@ -26,8 +26,9 @@ export default function useVideoPrefetch() {
     setLoadError(false);
     setReadyFlag(false);
     // jeśli już mamy w cache – nie pobieraj ponownie
-    if (cacheRef.current.has(url)) {
-      const { mime, blobUrl } = cacheRef.current.get(url);
+    const hit = cacheRef.current.get(url);
+    if (hit) {
+      const { mime, blobUrl } = hit;
       setNextMime(mime);
       setNextBlobUrl(blobUrl);
       setReadyFlag(true);
@@ -40,8 +41,8 @@ export default function useVideoPrefetch() {
     const { controller, onProgress } = getBinaryAsBlobUrl({
       url,
       onProgress: (pct) => setProgress(pct),
-      onDone: ({ mime, blobUrl }) => {
-        cacheRef.current.set(url, { mime, blobUrl }); // zapisz do cache
+      onDone: ({ mime, blobUrl, size }) => {
+        cacheRef.current.set(url, { mime, blobUrl, size });
         setNextMime(mime);
         setNextBlobUrl(blobUrl);
         setReadyFlag(true);
@@ -54,8 +55,6 @@ export default function useVideoPrefetch() {
   }, []);
 
   const retryLoad = useCallback((url) => {
-    const cached = cacheRef.current.get(url);
-    if (cached) URL.revokeObjectURL(cached.blobUrl);
     cacheRef.current.delete(url);
     triggerLoad(url);
   }, [triggerLoad]);

@@ -23,7 +23,7 @@ export function getBinaryAsBlobUrl({ url, onProgress, onDone, onError }) {
     const type = xhr.getResponseHeader('Content-Type')?.split(';')[0] || "video/mp4";
     const blob = new Blob([e.target.response], { type });
     const blobUrl = URL.createObjectURL(blob);
-    onDone?.({ mime: type, blobUrl });
+    onDone?.({ mime: type, blobUrl, size: blob.size });
   }
 
   function fail() { if (!aborted) onError?.(); }

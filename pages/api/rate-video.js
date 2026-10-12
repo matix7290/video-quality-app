@@ -5,25 +5,25 @@ import { questionsForPhase } from '../../utils/questions.cjs';
 export default function handler(req, res) {
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
   const { sessionId, videoName, rating, duration, phase = 'standard', answers = [] } = req.body || {};
-  const user = typeof sessionId === 'string' && db.prepare('SELECT * FROM users WHERE session_id = ?').get(sessionId);
-  if (!user) return res.status(404).json({ error: 'Session not found' });
-  const playlist = JSON.parse(user.playlist);
-  if (!playlist.some(url => decodeURIComponent(url.split('/').pop()) === videoName)) {
-    return res.status(400).json({ error: 'Video not in session playlist' });
-  }
-  const settings = sessionSettings(user);
-  const studyPhases = phases(settings);
-  if (!studyPhases.includes(phase)) return res.status(400).json({ error: 'Phase not enabled for this session' });
-  const questions = questionsForPhase(JSON.parse(user.questions_snapshot)[videoName] || [], settings, phase);
-  try { validateResponse({ rating, duration, phase, answers }, questions, settings); }
-  catch (error) { return res.status(400).json({ error: error.message }); }
-  if (studyPhases.length === 2 && phase === studyPhases[1]) {
-    const rated = db.prepare('SELECT DISTINCT video_name FROM ratings WHERE user_id = ? AND phase = ?').all(user.id, studyPhases[0]);
-    if (playlist.some(url => !rated.some(r => r.video_name === decodeURIComponent(url.split('/').pop())))) {
-      return res.status(409).json({ error: 'Complete the first phase before starting the second' });
-    }
-  }
   try {
+    const user = typeof sessionId === 'string' && db.prepare('SELECT * FROM users WHERE session_id = ?').get(sessionId);
+    if (!user) return res.status(404).json({ error: 'Session not found' });
+    const playlist = JSON.parse(user.playlist);
+    if (!playlist.some(url => decodeURIComponent(url.split('/').pop()) === videoName)) {
+      return res.status(400).json({ error: 'Video not in session playlist' });
+    }
+    const settings = sessionSettings(user);
+    const studyPhases = phases(settings);
+    if (!studyPhases.includes(phase)) return res.status(400).json({ error: 'Phase not enabled for this session' });
+    const questions = questionsForPhase(JSON.parse(user.questions_snapshot)[videoName] || [], settings, phase);
+    try { validateResponse({ rating, duration, phase, answers }, questions, settings); }
+    catch (error) { return res.status(400).json({ error: error.message }); }
+    if (studyPhases.length === 2 && phase === studyPhases[1]) {
+      const rated = db.prepare('SELECT DISTINCT video_name FROM ratings WHERE user_id = ? AND phase = ?').all(user.id, studyPhases[0]);
+      if (playlist.some(url => !rated.some(r => r.video_name === decodeURIComponent(url.split('/').pop())))) {
+        return res.status(409).json({ error: 'Complete the first phase before starting the second' });
+      }
+    }
     db.transaction(() => {
       // Retrying a request after a lost response must not duplicate observations.
       const existing = db.prepare('SELECT id FROM ratings WHERE user_id = ? AND video_name = ? AND phase = ?').get(user.id, videoName, phase);
@@ -42,9 +42,13 @@ export default function handler(req, res) {
           question.correctAnswer === null ? null : Number(question.correctAnswer),
           question.correctAnswer === null ? null : Number(answer === question.correctAnswer));
       }
-    })();
+    }).immediate();
     return res.json({ message: 'Rating saved successfully' });
   } catch (error) {
+    if (error.code?.startsWith('SQLITE_BUSY')) {
+      res.setHeader('Retry-After', '1');
+      return res.status(503).json({ error: 'Database busy. Retry the same request.' });
+    }
     console.error('Error saving response:', error);
     return res.status(500).json({ error: 'Cannot save response' });
   }

@@ -26,6 +26,10 @@ export default function handler(req, res) {
 
         return res.status(200).json({ message: 'End time updated successfully' });
     } catch (error) {
+        if (error.code?.startsWith('SQLITE_BUSY')) {
+            res.setHeader('Retry-After', '1');
+            return res.status(503).json({ error: 'Database busy. Retry the same request.' });
+        }
         console.error('Error updating end time:', error);
         return res.status(500).json({ error: 'Internal Server Error' });
     }

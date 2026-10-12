@@ -1,6 +1,9 @@
 const Database = require("better-sqlite3");
 
-const db = new Database("video_quality.db");
+const db = new Database(process.env.DATABASE_PATH || "video_quality.db", { timeout: 1000 });
+// Readers can continue during a write. FULL retains commit durability on power loss.
+db.pragma('journal_mode = WAL');
+db.pragma('synchronous = FULL');
 
 db.exec(`
     CREATE TABLE IF NOT EXISTS users (
@@ -68,6 +71,24 @@ addColumn('ratings', 'phase', "TEXT NOT NULL DEFAULT 'standard'");
 addColumn('ratings', 'scale_type', "TEXT NOT NULL DEFAULT 'categorical'");
 addColumn('ratings', 'stimulus_type', "TEXT NOT NULL DEFAULT 'video'");
 db.exec(`
+    CREATE INDEX IF NOT EXISTS idx_ratings_session_phase_video
+        ON ratings(user_id, phase, video_name);
+    CREATE INDEX IF NOT EXISTS idx_users_balanced_version
+        ON users(json_extract(settings_snapshot, '$.version'))
+        WHERE json_valid(settings_snapshot)
+          AND json_extract(settings_snapshot, '$.mode') = 'both'
+          AND json_extract(settings_snapshot, '$.phaseOrder') = 'balanced';
+    CREATE UNIQUE INDEX IF NOT EXISTS idx_screentests_session ON screentests(session_id);
+    -- Preserve historical duplicates while preventing any new duplicate observations.
+    CREATE TRIGGER IF NOT EXISTS trg_ratings_no_duplicates
+    BEFORE INSERT ON ratings
+    WHEN NEW.user_id IS NOT NULL AND EXISTS (
+        SELECT 1 FROM ratings WHERE user_id = NEW.user_id
+          AND phase = NEW.phase AND video_name = NEW.video_name
+    )
+    BEGIN
+        SELECT RAISE(ABORT, 'Duplicate session stimulus phase');
+    END;
     CREATE TABLE IF NOT EXISTS control_answers (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         rating_id INTEGER NOT NULL REFERENCES ratings(id),

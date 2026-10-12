@@ -26,6 +26,15 @@ Zapobiega to pominięciu przygotowania SQLite przez npm 12; opis mechanizmu jest
 Filmy MP4 umieść w `public/videos`, a zdjęcia JPG/PNG/WebP w `public/images` albo importuj je w panelu. `npm run build`, `npm run lint` i `npm test`
 sprawdzają kompilację, kod oraz import CSV, migrację i zapis odpowiedzi.
 
+## Wdrożenie i 100 równoczesnych uczestników
+
+Konfigurację Nginx, uruchomienie przez `npm run start:production`, test obciążeniowy
+`npm run test:load` i bezpieczne kopie SQLite przez `npm run db:backup` opisuje
+[instrukcja wdrożenia](docs/deployment.md).
+Osobno dostępna jest [instrukcja krok po kroku dla AlmaLinux 9](docs/deployment-almalinux9.md).
+Przy już podłączonej domenie skorzystaj z [wariantu na porcie 80](docs/deployment-almalinux9-http.md).
+Wyniki lokalnej weryfikacji są w [raporcie testu 100 uczestników](docs/performance-100-2026-10-09.md).
+
 ## Filmy lub zdjęcia jako stymuli
 
 W **Panel administratora → Stymuli → Rodzaj stymulów** wybierz filmy MP4 albo zdjęcia

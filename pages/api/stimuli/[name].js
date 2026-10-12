@@ -13,7 +13,8 @@ export default function handler(req, res) {
   res.setHeader('Content-Type', info.mime);
   res.setHeader('X-Content-Type-Options', 'nosniff');
   res.setHeader('Accept-Ranges', 'bytes');
-  res.setHeader('Cache-Control', 'no-cache');
+  // Imports never overwrite a filename; use a new name for a changed stimulus.
+  res.setHeader('Cache-Control', 'public, max-age=3600');
   let start = 0, end = stat.size - 1;
   const range = req.headers.range;
   if (range) {
