@@ -245,5 +245,12 @@
   "Nie udało się usunąć bodźca. Spróbuj ponownie.": "Could not delete the stimulus. Please try again.",
   "Nieprawidłowa nazwa bodźca.": "Invalid stimulus filename.",
   "Bodziec nie jest dostępny.": "The stimulus is not available.",
-  "Brak wybranych bodźców. Dodaj lub wybierz bodźce w panelu administratora.": "No stimuli selected. Add or select stimuli in the admin panel."
+  "Brak wybranych bodźców. Dodaj lub wybierz bodźce w panelu administratora.": "No stimuli selected. Add or select stimuli in the admin panel.",
+  "Przeciągnij tutaj zdjęcia lub folder ze zdjęciami": "Drag images or a folder of images here",
+  "Przeciągnij tutaj filmy lub folder z filmami": "Drag videos or a folder of videos here",
+  "Upuść pliki, aby je dodać": "Drop files to add them",
+  "lub kliknij, aby wybrać pliki": "or click to choose files",
+  "JPG, PNG, WebP · do 50 MB na plik": "JPG, PNG, WebP · up to 50 MB per file",
+  "MP4 · do 2 GB na plik": "MP4 · up to 2 GB per file",
+  "Nie udało się odczytać upuszczonych plików. Spróbuj ponownie lub użyj przycisku Dodaj folder.": "Could not read the dropped files. Try again or use the Add folder button."
 }

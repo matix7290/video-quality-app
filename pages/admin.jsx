@@ -8,6 +8,7 @@ import RatingPanel from '@/components/RatingPanel';
 import StimulusPreview from '@/components/StimulusPreview';
 import AdminLanguageSwitcher from '@/components/AdminLanguageSwitcher';
 import ConfirmStimulusDeletion from '@/components/ConfirmStimulusDeletion';
+import StimulusDropZone from '@/components/StimulusDropZone';
 import { adminMessage, translateAdmin } from '@/utils/admin-i18n.cjs';
 import { phases, phaseIntroKeys } from '@/utils/study-phases.cjs';
 import { questionRows, questionsToCsv, removeStimulusQuestions } from '@/utils/questions.cjs';
@@ -166,8 +167,9 @@ export default function Admin() {
     try { await axios.delete('/api/admin/passkeys', { data: { id } }); setRemovingKey(null); await loadPasskeys(); setMessage('Klucz dostępu usunięty z panelu. Nie będzie już działać podczas logowania.'); }
     catch (e) { setPasskeyError(e.response?.data?.error || 'Nie udało się usunąć klucza dostępu.'); } finally { setBusy(false); }
   };
-  const importStimuli = async event => {
-    const files = Array.from(event.target.files).filter(file => stimulusInfo(file.name)?.type === settings.stimulusType); event.target.value = '';
+  const importStimuli = async selectedFiles => {
+    if (busy) return;
+    const files = Array.from(selectedFiles).filter(file => stimulusInfo(file.name)?.type === settings.stimulusType);
     if (!files.length) { setError(imageStudy ? 'Wybierz zdjęcia w formacie JPG, PNG lub WebP albo folder zawierający takie zdjęcia.' : 'Wybierz filmy w formacie MP4 albo folder zawierający takie filmy.'); return; }
     setBusy(true); setError(''); let imported = [], failures = [];
     for (let i = 0; i < files.length; i++) {
@@ -183,6 +185,10 @@ export default function Admin() {
     setMessage(adminMessage('Dodane pliki: {count} z {total}. Zapisz ustawienia, aby użyć ich w badaniu.', { count: imported.length, total: files.length }));
     if (failures.length) setError(failures);
     setBusy(false);
+  };
+  const chooseStimuli = event => {
+    const files = Array.from(event.target.files); event.target.value = '';
+    if (files.length) importStimuli(files);
   };
   const importCsv = async event => {
     const file = event.target.files[0]; event.target.value = ''; if (!file) return;
@@ -236,13 +242,13 @@ export default function Admin() {
         <fieldset className="admin-editor" disabled={busy}>
         {tab === 'videos' && <section className="admin-section">
           <div className="admin-section-heading"><div><h2>{t("Bodźce")}</h2><p>{t("Wybierz bodźce, czyli filmy lub zdjęcia, które uczestnicy zobaczą w badaniu.")}</p></div>
-            <div className="admin-actions"><label className="admin-secondary admin-file">{t("Dodaj folder")}<input type="file" multiple webkitdirectory="" directory="" onChange={importStimuli} /></label>
-              <label className="admin-secondary admin-file">{imageStudy ? t('Dodaj zdjęcia') : t('Dodaj filmy')}<input type="file" accept={imageStudy ? '.jpg,.jpeg,.png,.webp,image/jpeg,image/png,image/webp' : 'video/mp4,.mp4'} multiple onChange={importStimuli} /></label></div>
+            <div className="admin-actions"><label className="admin-secondary admin-file">{t("Dodaj folder")}<input type="file" multiple webkitdirectory="" directory="" onChange={chooseStimuli} /></label>
+              <label className="admin-secondary admin-file">{imageStudy ? t('Dodaj zdjęcia') : t('Dodaj filmy')}<input type="file" accept={imageStudy ? '.jpg,.jpeg,.png,.webp,image/jpeg,image/png,image/webp' : 'video/mp4,.mp4'} multiple onChange={chooseStimuli} /></label></div>
           </div>
           <Field label={t("Rodzaj bodźców")}><select value={settings.stimulusType} onChange={e => changeStimulusType(e.target.value)}><option value="video">{t("Filmy (MP4)")}</option><option value="image">{t("Zdjęcia (JPG, PNG, WebP)")}</option></select></Field>
           <p className="admin-note">{imageStudy ? t('Możesz dodać zdjęcia JPG, PNG i WebP o rozmiarze do 50 MB każde. Czas wyświetlania ustawisz w zakładce Przebieg i skale.') : t('Możesz dodać filmy MP4 o rozmiarze do 2 GB każdy.')} {t("Dodawanie plików nie zmienia wcześniej dodanych materiałów. W jednym badaniu można używać filmów albo zdjęć.")}</p>
           <div className="admin-actions mb-5"><button className="admin-small" onClick={() => change({ selectedVideos: activeCatalog.map(file => file.name) })}>{t("Wybierz wszystkie")}</button><button className="admin-small" onClick={() => change({ selectedVideos: [] })}>{t("Odznacz wszystkie")}</button></div>
-          {!activeCatalog.length && <div className="admin-empty">{imageStudy ? t('Dodaj zdjęcia lub folder ze zdjęciami, aby przygotować badanie.') : t('Dodaj filmy lub folder z filmami, aby przygotować badanie.')}</div>}
+          <StimulusDropZone imageStudy={imageStudy} busy={busy} onFiles={importStimuli} onError={setError} t={t} />
           {settings.selectedVideos.filter(name => !activeCatalog.some(file => file.name === name)).map(name => <div key={name} className="admin-error">{t("Niedostępny bodziec:")} {name} <button onClick={() => change({ selectedVideos: settings.selectedVideos.filter(item => item !== name) })}>{t("Odznacz")}</button></div>)}
           <div className="admin-video-list">{activeCatalog.map(file => <div key={file.name} className="admin-video-row"><label><input type="checkbox" checked={settings.selectedVideos.includes(file.name)} onChange={e => change({ selectedVideos: e.target.checked ? [...settings.selectedVideos, file.name] : settings.selectedVideos.filter(name => name !== file.name) })} /><span>{file.name}<small>{(file.size / 1024 ** 2).toLocaleString(adminLocale, { minimumFractionDigits: 1, maximumFractionDigits: 1 })} MB</small></span></label><div className="admin-video-row-actions"><button type="button" className="admin-small" onClick={() => setSelectedPreview(file.url)}>{t("Podgląd")}</button><button type="button" className="admin-remove" onClick={() => { setPendingDeletion(file); setDeletionError(''); }}>{t("Usuń")}</button></div></div>)}</div>
         </section>}
