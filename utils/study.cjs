@@ -11,6 +11,7 @@ function readStudy() {
     const filenames = files.map(file => file.name);
     const configuration = readConfiguration();
     const selected = configuration.settings.selectedVideos || files.filter(file => file.type === configuration.settings.stimulusType).map(file => file.name);
+    if (!selected.length) throw new Error('Brak wybranych bodźców. Dodaj lub wybierz bodźce w panelu administratora.');
     if (selected.some(name => !filenames.includes(name))) throw new Error('Wybrany bodziec nie jest już dostępny. Popraw wybór w panelu administratora.');
     const allQuestions = parseQuestions(configuration.questionsCsv, filenames);
     const questions = Object.fromEntries(Object.entries(allQuestions).filter(([name]) => selected.includes(name)));

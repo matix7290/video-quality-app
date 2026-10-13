@@ -234,5 +234,16 @@
   "Nieprawidłowa operacja związana z kluczem dostępu.": "Invalid passkey operation.",
   "Nie udało się potwierdzić klucza dostępu. Spróbuj ponownie lub zaloguj się hasłem.": "Could not verify the passkey. Try again or sign in with your password.",
   "Nieprawidłowy rodzaj pobieranych wyników.": "Invalid results download type.",
-  "Nie udało się pobrać wyników.": "Could not download results."
+  "Nie udało się pobrać wyników.": "Could not download results.",
+  "Usuń": "Delete",
+  "Usuń bodziec": "Delete stimulus",
+  "Usunąć bodziec?": "Delete this stimulus?",
+  "Zamknij potwierdzenie": "Close confirmation",
+  "Plik zostanie trwale usunięty z serwera, wyboru do badania i powiązanych pytań kontrolnych. Zebrane wyniki zostaną zachowane.": "The file will be permanently deleted from the server, the study selection and its linked control questions. Collected results will be retained.",
+  "Usuwanie…": "Deleting…",
+  "Usunięto bodziec: {name}.": "Stimulus deleted: {name}.",
+  "Nie udało się usunąć bodźca. Spróbuj ponownie.": "Could not delete the stimulus. Please try again.",
+  "Nieprawidłowa nazwa bodźca.": "Invalid stimulus filename.",
+  "Bodziec nie jest dostępny.": "The stimulus is not available.",
+  "Brak wybranych bodźców. Dodaj lub wybierz bodźce w panelu administratora.": "No stimuli selected. Add or select stimuli in the admin panel."
 }

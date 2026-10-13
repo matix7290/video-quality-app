@@ -42,7 +42,7 @@ function catalog(type) {
         url: `/api/stimuli/${encodeURIComponent(entry.name)}` }));
   }).sort((a, b) => a.name.localeCompare(b.name))).filter(file => !type || file.type === type);
 }
-function validateConfig(input, filenames) {
+function validateConfig(input, filenames, { allowEmptySelection = false } = {}) {
   if (!input || typeof input !== 'object') throw new Error('Brak ustawień badania.');
   const settings = defaults();
   if (typeof input.title !== 'string' || !input.title.trim() || input.title.length > 200) throw new Error('Podaj nazwę badania (do 200 znaków).');
@@ -64,7 +64,7 @@ function validateConfig(input, filenames) {
   settings.autoFullscreen = input.autoFullscreen ?? false;
   if (![0.01, 0.1, 0.25, 0.5, 1].includes(input.sliderStep)) throw new Error('Nieprawidłowy krok suwaka.');
   settings.sliderStep = input.sliderStep;
-  if (!Array.isArray(input.selectedVideos) || !input.selectedVideos.length || new Set(input.selectedVideos).size !== input.selectedVideos.length ||
+  if (!Array.isArray(input.selectedVideos) || (!allowEmptySelection && !input.selectedVideos.length) || new Set(input.selectedVideos).size !== input.selectedVideos.length ||
       input.selectedVideos.some(name => !filenames.includes(name) || stimulusInfo(name)?.type !== settings.stimulusType)) throw new Error('Wybierz przynajmniej jeden dostępny bodziec wybranego rodzaju. Każdy plik można wybrać tylko raz.');
   settings.selectedVideos = [...input.selectedVideos];
   for (const locale of ['pl', 'en']) {
@@ -89,7 +89,7 @@ function readConfiguration() {
     const location = path.join(process.cwd(), 'config/study.json');
     if (fs.existsSync(location)) {
       const saved = JSON.parse(fs.readFileSync(location, 'utf8'));
-      return { settings: validateConfig(saved.settings, [...files.map(file => file.name), ...(saved.settings?.selectedVideos || [])]), questionsCsv: saved.questionsCsv };
+      return { settings: validateConfig(saved.settings, [...files.map(file => file.name), ...(saved.settings?.selectedVideos || [])], { allowEmptySelection: true }), questionsCsv: saved.questionsCsv };
     }
     const csvPath = path.join(process.cwd(), 'config/control-questions.csv');
     return { settings: defaults(), questionsCsv: fs.existsSync(csvPath) ? fs.readFileSync(csvPath, 'utf8') : 'video_name,question,correct_answer\n' };

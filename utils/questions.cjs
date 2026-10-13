@@ -57,6 +57,15 @@ function questionsToCsv(rows, { stimulusType = 'video' } = {}) {
   const escape = value => '"' + String(value ?? '').replaceAll('"', '""') + '"';
   return `${stimulusType === 'image' ? 'stimulus_name' : 'video_name'},question,correct_answer,part\n` + rows.map(row => [row.video_name, row.question, row.correct_answer, row.part ?? 'first'].map(escape).join(',')).join('\n') + (rows.length ? '\n' : '');
 }
+function removeStimulusQuestions(csv, name) {
+  const [header, ...rows] = parseCsv(csv);
+  if (!header) return csv;
+  const nameColumns = ['stimulus_name', 'video_name'].map(column => header.indexOf(column)).filter(index => index !== -1);
+  const remaining = rows.filter(row => !nameColumns.some(index => row[index] === name));
+  if (remaining.length === rows.length) return csv;
+  const escape = value => '"' + value.replaceAll('"', '""') + '"';
+  return [header, ...remaining].map(row => row.map(escape).join(',')).join('\n') + '\n';
+}
 function questionRows(csv, filenames) {
   return Object.entries(parseQuestions(csv, filenames)).flatMap(([video_name, questions]) => questions.map(q => ({ video_name, question: q.question, correct_answer: q.correctAnswer === null ? '' : q.correctAnswer ? 'tak' : 'nie', part: q.part })));
 }
@@ -71,4 +80,4 @@ function questionsForPhase(questions, settings, phase) {
     return part === 'both' || part === (position === 0 ? 'first' : 'second');
   });
 }
-module.exports = { parseCsv, parseQuestions, questionsToCsv, questionRows, questionsForPhase };
+module.exports = { parseCsv, parseQuestions, questionsToCsv, questionRows, questionsForPhase, removeStimulusQuestions };

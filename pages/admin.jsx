@@ -7,9 +7,10 @@ import StartScreen from '@/components/StartScreen';
 import RatingPanel from '@/components/RatingPanel';
 import StimulusPreview from '@/components/StimulusPreview';
 import AdminLanguageSwitcher from '@/components/AdminLanguageSwitcher';
+import ConfirmStimulusDeletion from '@/components/ConfirmStimulusDeletion';
 import { adminMessage, translateAdmin } from '@/utils/admin-i18n.cjs';
 import { phases, phaseIntroKeys } from '@/utils/study-phases.cjs';
-import { questionRows, questionsToCsv } from '@/utils/questions.cjs';
+import { questionRows, questionsToCsv, removeStimulusQuestions } from '@/utils/questions.cjs';
 import { stimulusInfo } from '@/utils/stimuli.cjs';
 import { adaptStudyTexts } from '@/utils/study-texts.cjs';
 import pl from '@/public/locales/pl/common.json';
@@ -47,6 +48,8 @@ export default function Admin() {
   const activeCatalog = catalog.filter(file => file.type === (settings?.stimulusType || 'video'));
   const imageStudy = settings?.stimulusType === 'image';
   const [questions, setQuestions] = useState([]);
+  const activeStimulusNames = new Set(activeCatalog.map(file => file.name));
+  const activeQuestionCount = questions.filter(question => activeStimulusNames.has(question.video_name)).length;
   const [rawCsv, setRawCsv] = useState(null);
   const [version, setVersion] = useState(null);
   const [tab, setTab] = useState('videos');
@@ -70,6 +73,8 @@ export default function Admin() {
   const [passkeyError, setPasskeyError] = useState('');
   const [removingKey, setRemovingKey] = useState(null);
   const [selectedPreview, setSelectedPreview] = useState('');
+  const [pendingDeletion, setPendingDeletion] = useState(null);
+  const [deletionError, setDeletionError] = useState('');
   const [stats, setStats] = useState(null);
   const [completeOnly, setCompleteOnly] = useState(true);
   const [loading, setLoading] = useState(true);
@@ -184,6 +189,26 @@ export default function Admin() {
     try { const rows = questionRows(await file.text(), catalog.map(video => video.name)); changeQuestions(rows); setRawCsv(null); setError(''); setMessage(adminMessage('Wczytano pytania z pliku: {count}. Zapisz ustawienia, aby użyć ich w badaniu.', { count: rows.length })); }
     catch (e) { fail(e); }
   };
+  const removeStimulus = async () => {
+    if (!pendingDeletion || busy) return;
+    const file = pendingDeletion;
+    setBusy(true); setDeletionError(''); setMessage(''); setError('');
+    try {
+      const nextRawCsv = rawCsv === null ? null : removeStimulusQuestions(rawCsv, file.name);
+      const { data } = await axios.delete('/api/admin/stimuli', { data: { name: file.name } });
+      setCatalog(data.catalog); setVersion(data.version);
+      setSettings(previous => ({ ...previous, selectedVideos: previous.selectedVideos.filter(name => name !== file.name) }));
+      setSelectionsByType(previous => Object.fromEntries(Object.entries(previous).map(([type, names]) => [type, names.filter(name => name !== file.name)])));
+      setQuestions(previous => previous.filter(question => question.video_name !== file.name));
+      setRawCsv(nextRawCsv);
+      setSelectedPreview(previous => previous === file.url ? '' : previous);
+      setPendingDeletion(null);
+      setMessage(adminMessage('Usunięto bodziec: {name}.', { name: file.name }));
+    } catch (e) {
+      setDeletionError(e.response?.data?.error || e.message || 'Nie udało się usunąć bodźca. Spróbuj ponownie.');
+      if (e.response?.status === 401) { fail(e); setPendingDeletion(null); }
+    } finally { setBusy(false); }
+  };
   const showResults = async () => {
     setTab('results'); setError('');
     try { const { data } = await axios.get('/api/admin/results'); setStats(data); } catch (e) { fail(e); }
@@ -206,7 +231,7 @@ export default function Admin() {
         <div className="admin-sidebar-footer"><p>{passwordProtected ? t('Dostęp chroniony hasłem') : t('Dostęp na tym komputerze · localhost')}</p><Link href="/" target="_blank">{t("Otwórz badanie ↗")}</Link>{passwordProtected && <button disabled={busy} onClick={async () => { await axios.delete('/api/admin/auth'); setSettings(null); setAccess({ passwordRequired: true }); setPasskeys([]); setError(''); setMessage(''); }}>{t("Wyloguj się")}</button>}</div>
       </div></aside>
       <main className="admin-main"><header className="admin-header"><div><p className="admin-eyebrow">{t("USTAWIENIA BADANIA")}</p><h1>{settings.title}</h1><p>{dirty ? t('Niezapisane zmiany') : t("Zapisana wersja · {version}", { version: version || t("ustawienia początkowe") })}</p></div><div className="admin-header-actions"><AdminLanguageSwitcher locale={adminLocale} onChange={changeAdminLocale} label={t("Język panelu")} /><button className="admin-primary" onClick={save} disabled={busy || !dirty || !settings.selectedVideos.length}>{busy ? t('Przetwarzanie…') : t('Zapisz ustawienia')}</button></div></header>
-        <div className="admin-summary"><span>{t("Bodźce:")} <strong>{settings.selectedVideos.length}</strong></span><span>{t("Części badania:")} <strong>{settings.mode === 'both' ? 2 : 1}</strong></span><span>{t("Pytania kontrolne:")} <strong>{questions.length}</strong></span><span>{t("Zmiany dotyczą osób rozpoczynających badanie")}</span></div>
+        <div className="admin-summary"><span>{t("Bodźce:")} <strong>{settings.selectedVideos.length}</strong></span><span>{t("Części badania:")} <strong>{settings.mode === 'both' ? 2 : 1}</strong></span><span>{t("Pytania kontrolne:")} <strong>{activeQuestionCount}</strong></span><span>{t("Zmiany dotyczą osób rozpoczynających badanie")}</span></div>
         {error && <div role="alert" className="admin-error">{t(error)}</div>}{message && <div role="status" className="admin-message">{t(message)}</div>}
         <fieldset className="admin-editor" disabled={busy}>
         {tab === 'videos' && <section className="admin-section">
@@ -219,7 +244,7 @@ export default function Admin() {
           <div className="admin-actions mb-5"><button className="admin-small" onClick={() => change({ selectedVideos: activeCatalog.map(file => file.name) })}>{t("Wybierz wszystkie")}</button><button className="admin-small" onClick={() => change({ selectedVideos: [] })}>{t("Odznacz wszystkie")}</button></div>
           {!activeCatalog.length && <div className="admin-empty">{imageStudy ? t('Dodaj zdjęcia lub folder ze zdjęciami, aby przygotować badanie.') : t('Dodaj filmy lub folder z filmami, aby przygotować badanie.')}</div>}
           {settings.selectedVideos.filter(name => !activeCatalog.some(file => file.name === name)).map(name => <div key={name} className="admin-error">{t("Niedostępny bodziec:")} {name} <button onClick={() => change({ selectedVideos: settings.selectedVideos.filter(item => item !== name) })}>{t("Odznacz")}</button></div>)}
-          <div className="admin-video-list">{activeCatalog.map(file => <div key={file.name} className="admin-video-row"><label><input type="checkbox" checked={settings.selectedVideos.includes(file.name)} onChange={e => change({ selectedVideos: e.target.checked ? [...settings.selectedVideos, file.name] : settings.selectedVideos.filter(name => name !== file.name) })} /><span>{file.name}<small>{(file.size / 1024 ** 2).toLocaleString(adminLocale, { minimumFractionDigits: 1, maximumFractionDigits: 1 })} MB</small></span></label><button className="admin-small" onClick={() => setSelectedPreview(selectedPreview === file.url ? '' : file.url)}>{t("Podgląd")}</button></div>)}</div>
+          <div className="admin-video-list">{activeCatalog.map(file => <div key={file.name} className="admin-video-row"><label><input type="checkbox" checked={settings.selectedVideos.includes(file.name)} onChange={e => change({ selectedVideos: e.target.checked ? [...settings.selectedVideos, file.name] : settings.selectedVideos.filter(name => name !== file.name) })} /><span>{file.name}<small>{(file.size / 1024 ** 2).toLocaleString(adminLocale, { minimumFractionDigits: 1, maximumFractionDigits: 1 })} MB</small></span></label><div className="admin-video-row-actions"><button type="button" className="admin-small" onClick={() => setSelectedPreview(file.url)}>{t("Podgląd")}</button><button type="button" className="admin-remove" onClick={() => { setPendingDeletion(file); setDeletionError(''); }}>{t("Usuń")}</button></div></div>)}</div>
         </section>}
         {tab === 'flow' && <section className="admin-section"><h2>{t("Przebieg i skale")}</h2><p className="admin-note">{t("W obu częściach badania uczestnik zobaczy te same bodźce w tej samej kolejności.")}</p><div className="admin-grid">
           <Field label={t("Nazwa badania")}><input value={settings.title} maxLength={200} onChange={e => change({ title: e.target.value })} /></Field>
@@ -264,6 +289,7 @@ export default function Admin() {
         </fieldset>
       </main>
       {selectedPreview && <StimulusPreview key={selectedPreview} src={selectedPreview} image={imageStudy} locale={adminLocale} onClose={() => setSelectedPreview('')} />}
+      {pendingDeletion && <ConfirmStimulusDeletion file={pendingDeletion} locale={adminLocale} busy={busy} error={deletionError} onClose={() => setPendingDeletion(null)} onConfirm={removeStimulus} />}
     </div>
   </>;
 }

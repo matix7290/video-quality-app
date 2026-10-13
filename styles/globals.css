@@ -190,12 +190,18 @@ html:has(.admin-layout), body:has(.admin-layout) { overflow-x: clip; }
 .admin-video-row label { display: flex; gap: 14px; align-items: center; font-size: 14px; overflow-wrap: anywhere; min-width: 0; cursor: pointer; }
 .admin-video-row small { display: block; color: #94a3b8; margin-top: 5px; font-size: 12px; }
 .admin-video-row button { flex-shrink: 0; }
+.admin-video-row-actions { display: flex; align-items: center; gap: 18px; flex-shrink: 0; }
 .admin-stimulus-modal { position: fixed; inset: 0; margin: auto; width: min(1100px, calc(100vw - 32px)); max-width: none; max-height: calc(100dvh - 32px); padding: 16px; border: 1px solid #3a4b63; border-radius: 14px; background: #182235; color: #e5e7eb; box-shadow: 0 24px 80px #0008; overflow-y: auto; }
 .admin-stimulus-modal::backdrop { background: rgb(15 23 42 / 75%); }
 .admin-stimulus-modal-header { display: flex; align-items: center; justify-content: space-between; gap: 16px; margin-bottom: 16px; }
 .admin-stimulus-modal-header h2 { font-size: 18px; font-weight: 600; }
 .admin-stimulus-modal-close { display: grid; place-items: center; width: 40px; height: 40px; flex-shrink: 0; border-radius: 8px; background: #243247; color: #e5e7eb; font-size: 28px; cursor: pointer; }
 .admin-stimulus-modal-close:hover { background: #334155; }
+.admin-confirm-modal { width: min(600px, calc(100vw - 32px)); padding: 24px; }
+.admin-confirm-filename { font-weight: 600; overflow-wrap: anywhere; color: #f8fafc; }
+.admin-confirm-actions { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 12px; }
+.admin-danger { padding: 12px 18px; border: 1px solid #b91c1c; border-radius: 8px; background: #b91c1c; color: #fff; font-size: 14px; font-weight: 600; cursor: pointer; }
+.admin-danger:hover:not(:disabled) { background: #991b1b; }
 .admin-image-preview, .admin-video-preview { display: block; width: 100%; max-height: calc(100dvh - 122px); object-fit: contain; border-radius: 10px; background: #111827; }
 .admin-empty { border: 1px dashed #3a4b63; padding: 36px; color: #94a3b8; text-align: center; border-radius: 9px; }
 .admin-questions { display: grid; gap: 16px; }
