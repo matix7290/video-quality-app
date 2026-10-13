@@ -64,14 +64,14 @@ test('registration and login verify real ECDSA WebAuthn signatures and persist c
   await service.authenticate(req, response);
   assert.equal(db.prepare('SELECT counter FROM admin_passkeys').get().counter, 1);
   assert.ok(service.list('localhost')[0].last_used_at);
-  await assert.rejects(service.authenticate(req, response), /Próba passkey/);
+  await assert.rejects(service.authenticate(req, response), /Próba użycia klucza dostępu/);
 });
 test('expired challenges and copied responses without the browser cookie cannot log in', async () => {
   let attempt = await service.authenticationOptions(req); acceptCookie(attempt);
   const response = assertion(attempt.options);
   await assert.rejects(service.authenticate({ ...req, cookies: {} }, response), /Brak próby/);
   db.prepare('UPDATE admin_webauthn_challenges SET expires_at = 0').run();
-  await assert.rejects(service.authenticate(req, response), /Próba passkey/);
+  await assert.rejects(service.authenticate(req, response), /Próba użycia klucza dostępu/);
 });
 test('verification rejects wrong origins, RP IDs, challenges, user verification and signatures', async () => {
   for (const override of [{ origin: 'https://evil.example' }, { rpID: 'evil.example' }, { challenge: 'incorrect' }, { flags: 0x01 }, { flags: 0x04 }, { counter: 1 }, { badSignature: true }, { badUser: true }]) {
@@ -80,14 +80,14 @@ test('verification rejects wrong origins, RP IDs, challenges, user verification 
     if (override.badSignature) response.response.signature = b64(crypto.randomBytes(72));
     if (override.badUser) response.response.userHandle = 'unknown';
     await assert.rejects(service.authenticate(req, response));
-    await assert.rejects(service.authenticate(req, response), /Próba passkey/);
+    await assert.rejects(service.authenticate(req, response), /Próba użycia klucza dostępu/);
   }
   assert.equal(db.prepare('SELECT counter FROM admin_passkeys').get().counter, 1);
 });
 test('registrations are bound to the authenticated browser session and require verified user presence', async () => {
   const count = service.list('localhost').length;
   let attempt = await service.registrationOptions(req, 'Wrong session'); acceptCookie(attempt);
-  await assert.rejects(service.register({ ...req, cookies: { ...req.cookies, study_admin: 'different-session' } }, {}), /Próba passkey/);
+  await assert.rejects(service.register({ ...req, cookies: { ...req.cookies, study_admin: 'different-session' } }, {}), /Próba użycia klucza dostępu/);
   attempt = await service.registrationOptions(req, 'No verification'); acceptCookie(attempt);
   await assert.rejects(service.register(req, registration(attempt.options, { flags: 0x41 })));
   assert.equal(service.list('localhost').length, count);

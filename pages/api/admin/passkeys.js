@@ -11,13 +11,13 @@ export default async function handler(req, res) {
   if (req.method === 'GET' || req.method === 'DELETE' || ['register-options', 'register-verify'].includes(action)) {
     if (!requireAdmin(req, res)) return;
   }
-  if (!['GET', 'POST', 'DELETE'].includes(req.method)) return res.status(405).json({ error: 'Method not allowed' });
+  if (!['GET', 'POST', 'DELETE'].includes(req.method)) return res.status(405).json({ error: 'Ta operacja nie jest dostępna.' });
   try {
     authConfiguration();
     const { rpID, origin } = passkeyOrigin(req);
     if (req.method === 'GET') return res.json({ keys: service.list(rpID), origin });
     if (req.method === 'DELETE') {
-      if (typeof req.body?.id !== 'string') throw new Error('Nie wybrano klucza.');
+      if (typeof req.body?.id !== 'string') throw new Error('Nie wybrano klucza dostępu.');
       db.prepare('DELETE FROM admin_passkeys WHERE id = ? AND rp_id = ?').run(req.body.id, rpID);
       return res.json({ ok: true });
     }
@@ -44,11 +44,11 @@ export default async function handler(req, res) {
       res.setHeader('Set-Cookie', [challengeCookie(req, '', 0), loginCookie(req)]);
       return res.json({ ok: true });
     }
-    return res.status(400).json({ error: 'Nieprawidłowa operacja passkey.' });
+    return res.status(400).json({ error: 'Nieprawidłowa operacja związana z kluczem dostępu.' });
   } catch (error) {
     // Internal verification errors need not disclose credential material.
-    const expected = /^(Ustaw |ADMIN_ORIGIN |Dla passkey |Otwórz panel |Nieprawidłowy adres |Nie dodano |Podaj nazwę |Można zapisać |Brak próby |Próba passkey |Nieznany klucz |Nie wybrano |Klucz został |Nie udało)/.test(error.message);
-    return res.status(400).json({ error: expected ? error.message : 'Nie udało się zweryfikować passkey. Rozpocznij ponownie lub użyj hasła.' });
+    const expected = /^(Ustaw |ADMIN_ORIGIN |Aby użyć klucza dostępu, |Otwórz panel |Nieprawidłowy adres |Nie dodano |Podaj nazwę |Można zapisać |Brak próby |Próba użycia klucza dostępu |Nieznany klucz |Nie wybrano |Klucz dostępu został |Nie udało)/.test(error.message);
+    return res.status(400).json({ error: expected ? error.message : 'Nie udało się potwierdzić klucza dostępu. Spróbuj ponownie lub zaloguj się hasłem.' });
   }
 }
 export const config = { api: { bodyParser: { sizeLimit: '128kb' } } };

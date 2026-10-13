@@ -4,13 +4,13 @@ import { catalog, readConfiguration, validateConfig, writeConfiguration } from '
 import { parseQuestions, readStudy } from '../../../utils/study.cjs';
 export default function handler(req, res) {
   if (!requireAdmin(req, res)) return;
-  if (!['GET', 'PUT'].includes(req.method)) return res.status(405).json({ error: 'Method not allowed' });
+  if (!['GET', 'PUT'].includes(req.method)) return res.status(405).json({ error: 'Ta operacja nie jest dostępna.' });
   try {
     const files = catalog();
     if (req.method === 'PUT') {
       const settings = validateConfig(req.body?.settings, files.map(file => file.name));
       const csv = req.body?.questionsCsv;
-      if (typeof csv !== 'string' || csv.length > 500000) throw new Error('CSV jest za duży lub nieprawidłowy.');
+      if (typeof csv !== 'string' || csv.length > 500000) throw new Error('Plik CSV z pytaniami jest za duży lub ma nieprawidłową treść.');
       parseQuestions(csv, files.map(file => file.name));
       writeConfiguration(settings, csv);
     }

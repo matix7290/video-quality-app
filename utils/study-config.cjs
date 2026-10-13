@@ -43,11 +43,11 @@ function catalog(type) {
   }).sort((a, b) => a.name.localeCompare(b.name))).filter(file => !type || file.type === type);
 }
 function validateConfig(input, filenames) {
-  if (!input || typeof input !== 'object') throw new Error('Brak konfiguracji.');
+  if (!input || typeof input !== 'object') throw new Error('Brak ustawień badania.');
   const settings = defaults();
   if (typeof input.title !== 'string' || !input.title.trim() || input.title.length > 200) throw new Error('Podaj nazwę badania (do 200 znaków).');
   settings.title = input.title.trim();
-  if (!['video', 'image'].includes(input.stimulusType ?? 'video')) throw new Error('Nieprawidłowy rodzaj stymulów.');
+  if (!['video', 'image'].includes(input.stimulusType ?? 'video')) throw new Error('Nieprawidłowy rodzaj bodźców.');
   settings.stimulusType = input.stimulusType ?? 'video';
   const imageDuration = input.imageDuration ?? 5;
   if (typeof imageDuration !== 'number' || !Number.isFinite(imageDuration) || imageDuration < 0.5 || imageDuration > 300 ||
@@ -65,7 +65,7 @@ function validateConfig(input, filenames) {
   if (![0.01, 0.1, 0.25, 0.5, 1].includes(input.sliderStep)) throw new Error('Nieprawidłowy krok suwaka.');
   settings.sliderStep = input.sliderStep;
   if (!Array.isArray(input.selectedVideos) || !input.selectedVideos.length || new Set(input.selectedVideos).size !== input.selectedVideos.length ||
-      input.selectedVideos.some(name => !filenames.includes(name) || stimulusInfo(name)?.type !== settings.stimulusType)) throw new Error('Wybierz przynajmniej jeden dostępny stymulus wybranego rodzaju; każdy plik może wystąpić raz.');
+      input.selectedVideos.some(name => !filenames.includes(name) || stimulusInfo(name)?.type !== settings.stimulusType)) throw new Error('Wybierz przynajmniej jeden dostępny bodziec wybranego rodzaju. Każdy plik można wybrać tylko raz.');
   settings.selectedVideos = [...input.selectedVideos];
   for (const locale of ['pl', 'en']) {
     for (const key of TEXT_KEYS) {

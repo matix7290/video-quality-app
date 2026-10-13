@@ -139,6 +139,12 @@ html:has(.admin-layout), body:has(.admin-layout) { overflow-x: clip; }
 .admin-sidebar-footer button { text-align: left; }
 .admin-main { max-width: 1440px; width: 100%; margin: 0 auto; padding: 40px 44px 64px; }
 .admin-header { display: flex; justify-content: space-between; gap: 20px; align-items: center; margin-bottom: 30px; }
+.admin-header-actions { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 16px; }
+.admin-panel-language { display: flex; flex-direction: column; gap: 8px; font-size: 12px; color: #a8b5c8; }
+.admin-panel-language select { padding: 11px 12px; min-width: 120px; border: 1px solid #3a4b63; border-radius: 8px; background: #111b2d; color: #f8fafc; font: inherit; font-size: 14px; }
+.admin-header-actions .admin-panel-language select, .admin-header-actions .admin-primary { height: 46px; }
+.admin-panel-language select:focus-visible { outline: 2px solid #60a5fa; outline-offset: 3px; }
+.study-card > .admin-panel-language { width: fit-content; margin-bottom: 24px; }
 .admin-header h1 { font-size: 30px; font-weight: 700; letter-spacing: -.6px; margin: 8px 0; overflow-wrap: anywhere; }
 .admin-header p:last-child { font-size: 13px; color: #94a3b8; }
 .admin-eyebrow { font-size: 11px; letter-spacing: 2px; color: #93c5fd; font-weight: 700; }
@@ -166,6 +172,8 @@ html:has(.admin-layout), body:has(.admin-layout) { overflow-x: clip; }
 .admin-field > span { font-weight: 600; color: #cbd5e1; }
 .admin-field small { color: #94a3b8; }
 .admin-field input, .admin-field textarea, .admin-field select, .admin-actions select { background: #111b2d; border: 1px solid #3a4b63; padding: 11px 12px; border-radius: 8px; color: #f8fafc; width: 100%; font: inherit; }
+.admin-field-muted { opacity: .5; }
+.admin-field-muted input:disabled { background: #1b2432; border-color: #303b4b; color: #94a3b8; cursor: not-allowed; }
 .admin-actions select { width: auto; max-width: 100%; }
 .admin-field select:disabled { opacity: .5; cursor: not-allowed; }
 .admin-field textarea { resize: vertical; }
@@ -182,8 +190,13 @@ html:has(.admin-layout), body:has(.admin-layout) { overflow-x: clip; }
 .admin-video-row label { display: flex; gap: 14px; align-items: center; font-size: 14px; overflow-wrap: anywhere; min-width: 0; cursor: pointer; }
 .admin-video-row small { display: block; color: #94a3b8; margin-top: 5px; font-size: 12px; }
 .admin-video-row button { flex-shrink: 0; }
-.admin-image-preview { display: block; width: 100%; max-height: 480px; margin-top: 24px; object-fit: contain; border-radius: 10px; background: var(--background); }
-.admin-video-preview { width: 100%; max-height: 480px; margin-top: 24px; border-radius: 10px; background: #111827; }
+.admin-stimulus-modal { position: fixed; inset: 0; margin: auto; width: min(1100px, calc(100vw - 32px)); max-width: none; max-height: calc(100dvh - 32px); padding: 16px; border: 1px solid #3a4b63; border-radius: 14px; background: #182235; color: #e5e7eb; box-shadow: 0 24px 80px #0008; overflow-y: auto; }
+.admin-stimulus-modal::backdrop { background: rgb(15 23 42 / 75%); }
+.admin-stimulus-modal-header { display: flex; align-items: center; justify-content: space-between; gap: 16px; margin-bottom: 16px; }
+.admin-stimulus-modal-header h2 { font-size: 18px; font-weight: 600; }
+.admin-stimulus-modal-close { display: grid; place-items: center; width: 40px; height: 40px; flex-shrink: 0; border-radius: 8px; background: #243247; color: #e5e7eb; font-size: 28px; cursor: pointer; }
+.admin-stimulus-modal-close:hover { background: #334155; }
+.admin-image-preview, .admin-video-preview { display: block; width: 100%; max-height: calc(100dvh - 122px); object-fit: contain; border-radius: 10px; background: #111827; }
 .admin-empty { border: 1px dashed #3a4b63; padding: 36px; color: #94a3b8; text-align: center; border-radius: 9px; }
 .admin-questions { display: grid; gap: 16px; }
 .admin-question { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 18px; border: 1px solid #344155; border-radius: 10px; padding: 22px; }

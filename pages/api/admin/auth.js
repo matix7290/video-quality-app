@@ -10,7 +10,7 @@ export default async function handler(req, res) {
     res.setHeader('Set-Cookie', cookie(req, '', 0));
     return res.json({ ok: true });
   }
-  if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
+  if (req.method !== 'POST') return res.status(405).json({ error: 'Ta operacja nie jest dostępna.' });
   if (!passwordConfigured()) return res.status(403).json({ error: 'Otwórz panel przez localhost.' });
   let configuration;
   try { configuration = authConfiguration(); }
@@ -22,13 +22,13 @@ export default async function handler(req, res) {
   record.count++; attempts.set(key, record);
   if (record.count > 10) return res.status(429).json({ error: 'Zbyt wiele prób. Spróbuj ponownie za minutę.' });
   // Bound simultaneous memory use; asynchronous scrypt leaves study requests responsive.
-  if (verifying) return res.status(503).json({ error: 'Trwa weryfikacja logowania. Spróbuj ponownie za chwilę.' });
+  if (verifying) return res.status(503).json({ error: 'Trwa sprawdzanie danych logowania. Spróbuj ponownie za chwilę.' });
   verifying = true;
   try {
     if (!await verifyPassword(req.body?.password, configuration.hash)) return res.status(401).json({ error: 'Nieprawidłowe hasło.' });
     // Never issue a cookie if credentials were changed while verification was running.
     const current = authConfiguration();
-    if (current.hash !== configuration.hash || current.secret !== configuration.secret) return res.status(503).json({ error: 'Konfiguracja logowania zmieniła się. Spróbuj ponownie.' });
+    if (current.hash !== configuration.hash || current.secret !== configuration.secret) return res.status(503).json({ error: 'Ustawienia logowania zmieniły się. Spróbuj ponownie.' });
     attempts.delete(key);
     res.setHeader('Set-Cookie', loginCookie(req));
     return res.json({ ok: true });

@@ -3,7 +3,7 @@ const { promisify } = require('node:util');
 const scrypt = promisify(crypto.scrypt);
 // OWASP scrypt minimum: 128 MiB, a unique salt for every password.
 const options = { N: 131072, r: 8, p: 1, maxmem: 256 * 1024 * 1024 };
-const configurationError = 'Ustaw hasło poleceniem npm run admin:password i zrestartuj serwer.';
+const configurationError = 'Ustaw hasło poleceniem npm run admin:password i uruchom ponownie serwer.';
 function parseHash(value) {
   const match = /^scrypt:131072:8:1:([a-f0-9]{32}):([a-f0-9]{128})$/.exec(value || '');
   if (!match) throw new Error(configurationError);

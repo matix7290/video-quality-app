@@ -33,21 +33,21 @@ function parseQuestions(text, filenames) {
     throw new Error('CSV musi zawierać kolumny stimulus_name (lub video_name) i question; opcjonalnie correct_answer i part.');
   }
   if (new Set(header).size !== header.length) throw new Error('Powtórzone kolumny w CSV.');
-  if (header.includes('video_name') && header.includes('stimulus_name')) throw new Error('CSV: użyj tylko jednej kolumny nazwy stymulusu: stimulus_name lub video_name.');
+  if (header.includes('video_name') && header.includes('stimulus_name')) throw new Error('CSV: użyj tylko jednej kolumny nazwy bodźca: stimulus_name lub video_name.');
   const nameColumn = header.includes('stimulus_name') ? 'stimulus_name' : 'video_name';
   const questions = {};
   rows.forEach((row, i) => {
-    if (row.length !== header.length) throw new Error(`CSV: nieprawidłowa liczba kolumn w rekordzie ${i + 2}.`);
+    if (row.length !== header.length) throw new Error(`CSV: nieprawidłowa liczba kolumn w wierszu ${i + 2}.`);
     const name = row[header.indexOf(nameColumn)];
     const question = row[header.indexOf('question')];
-    if (!filenames.includes(name)) throw new Error(`CSV: nieznany stymulus ${name}.`);
-    if (!question) throw new Error(`CSV: puste pytanie w rekordzie ${i + 2}.`);
+    if (!filenames.includes(name)) throw new Error(`CSV: nieznany bodziec ${name}.`);
+    if (!question) throw new Error(`CSV: puste pytanie w wierszu ${i + 2}.`);
     const raw = header.includes('correct_answer') ? row[header.indexOf('correct_answer')].toLowerCase() : '';
     const answers = { yes: true, tak: true, no: false, nie: false };
-    if (raw && !Object.hasOwn(answers, raw)) throw new Error(`CSV: correct_answer musi być tak/nie lub yes/no (rekord ${i + 2}).`);
+    if (raw && !Object.hasOwn(answers, raw)) throw new Error(`CSV: correct_answer musi być tak/nie lub yes/no (wiersz ${i + 2}).`);
     // Older CSV files and session snapshots asked questions in the first part only.
     const part = (header.includes('part') ? row[header.indexOf('part')] : '') || 'first';
-    if (!['first', 'second', 'both'].includes(part)) throw new Error(`CSV: part musi być first, second lub both (rekord ${i + 2}).`);
+    if (!['first', 'second', 'both'].includes(part)) throw new Error(`CSV: part musi być first, second lub both (wiersz ${i + 2}).`);
     (questions[name] ||= []).push({ id: `q${i + 1}`, question, correctAnswer: raw ? answers[raw] : null, part });
   });
   return questions;

@@ -38,7 +38,7 @@ function requireAdmin(req, res) {
   if (!sameOrigin(req)) { res.status(403).json({ error: 'Żądanie musi pochodzić z tej aplikacji.' }); return false; }
   if (!authenticated(req)) {
     const registered = hasPasskeys();
-    res.status(401).json({ error: passwordConfigured() ? 'Zaloguj się do panelu.' : registered ? 'Przywróć konfigurację hasła poleceniem npm run admin:password i zrestartuj serwer.' : 'Panel bez hasła jest dostępny wyłącznie przez localhost.', passwordRequired: passwordConfigured() || registered });
+    res.status(401).json({ error: passwordConfigured() ? 'Zaloguj się do panelu.' : registered ? 'Przywróć ustawienia hasła poleceniem npm run admin:password i uruchom ponownie serwer.' : 'Panel bez hasła jest dostępny wyłącznie przez localhost.', passwordRequired: passwordConfigured() || registered });
     return false;
   }
   return true;

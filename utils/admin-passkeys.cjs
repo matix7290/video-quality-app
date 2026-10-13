@@ -14,11 +14,11 @@ function passkeyOrigin(req) {
     if (url.host !== req.headers.host) throw new Error('Otwórz panel pod adresem ustawionym w ADMIN_ORIGIN.');
   } else {
     if (!localRequest(req) || new URL(`http://${req.headers.host}`).hostname !== 'localhost') {
-      throw new Error('Dla passkey otwórz http://localhost lub ustaw ADMIN_ORIGIN na adres HTTPS wdrożenia.');
+      throw new Error('Aby użyć klucza dostępu, otwórz http://localhost lub ustaw ADMIN_ORIGIN na adres panelu zaczynający się od https://.');
     }
     url = new URL(`http://${req.headers.host}`);
   }
-  if (req.headers.origin && req.headers.origin !== url.origin) throw new Error('Nieprawidłowy adres źródłowy żądania passkey.');
+  if (req.headers.origin && req.headers.origin !== url.origin) throw new Error('Nieprawidłowy adres strony podczas użycia klucza dostępu.');
   return { origin: url.origin, rpID: url.hostname };
 }
 function challengeCookie(req, token, maxAge = 300) {
@@ -38,19 +38,19 @@ function createPasskeyService(db, verifier = webauthn) {
   }
   function consume(req, kind) {
     const token = req.cookies?.[CHALLENGE_COOKIE];
-    if (typeof token !== 'string' || !/^[A-Za-z0-9_-]{43}$/.test(token)) throw new Error('Brak próby passkey. Rozpocznij ponownie.');
+    if (typeof token !== 'string' || !/^[A-Za-z0-9_-]{43}$/.test(token)) throw new Error('Brak próby użycia klucza dostępu. Spróbuj ponownie.');
     const record = db.prepare('DELETE FROM admin_webauthn_challenges WHERE token_hash = ? RETURNING *').get(hash(token));
     const details = passkeyOrigin(req);
     if (!record || record.kind !== kind || record.expires_at <= Date.now() || record.origin !== details.origin || record.rp_id !== details.rpID ||
         (kind === 'register' && record.session_binding !== hash(req.cookies?.study_admin || ''))) {
-      throw new Error('Próba passkey wygasła lub jest nieprawidłowa. Rozpocznij ponownie.');
+      throw new Error('Próba użycia klucza dostępu wygasła lub jest nieprawidłowa. Spróbuj ponownie.');
     }
     return record;
   }
   async function registrationOptions(req, name) {
-    if (typeof name !== 'string' || !name.trim() || name.length > 100) throw new Error('Podaj nazwę klucza (do 100 znaków).');
+    if (typeof name !== 'string' || !name.trim() || name.length > 100) throw new Error('Podaj nazwę klucza dostępu (do 100 znaków).');
     const details = passkeyOrigin(req), existing = keys(details.rpID);
-    if (existing.length >= 20) throw new Error('Można zapisać maksymalnie 20 kluczy.');
+    if (existing.length >= 20) throw new Error('Można zapisać maksymalnie 20 kluczy dostępu.');
     const userHandle = existing[0]?.user_handle || crypto.randomBytes(32).toString('base64url');
     const options = await verifier.generateRegistrationOptions({ rpName: 'Video Quality · administrator', rpID: details.rpID,
       userName: 'administrator', userDisplayName: 'Administrator badania', userID: new Uint8Array(Buffer.from(userHandle, 'base64url')),
@@ -63,7 +63,7 @@ function createPasskeyService(db, verifier = webauthn) {
     const record = consume(req, 'register');
     const result = await verifier.verifyRegistrationResponse({ response, expectedChallenge: record.challenge,
       expectedOrigin: record.origin, expectedRPID: record.rp_id, requireUserVerification: true, supportedAlgorithmIDs: [-7, -257] });
-    if (!result.verified) throw new Error('Nie udało się zweryfikować nowego klucza.');
+    if (!result.verified) throw new Error('Nie udało się potwierdzić nowego klucza dostępu.');
     const info = result.registrationInfo;
     const key = info.credential;
     db.prepare(`INSERT INTO admin_passkeys (id, rp_id, user_handle, public_key, counter, transports, name, device_type, backed_up)
@@ -72,7 +72,7 @@ function createPasskeyService(db, verifier = webauthn) {
   }
   async function authenticationOptions(req) {
     const details = passkeyOrigin(req);
-    if (!keys(details.rpID).length) throw new Error('Nie dodano jeszcze passkey dla tego adresu. Zaloguj się hasłem i dodaj klucz w zakładce Dostęp.');
+    if (!keys(details.rpID).length) throw new Error('Nie dodano jeszcze klucza dostępu dla tego adresu. Zaloguj się hasłem i dodaj klucz w zakładce Dostęp.');
     // Discoverable credentials keep credential identifiers off the public login endpoint.
     const options = await verifier.generateAuthenticationOptions({ rpID: details.rpID, userVerification: 'required', timeout: 60000 });
     return saveChallenge(req, 'authenticate', options, details);
@@ -80,15 +80,15 @@ function createPasskeyService(db, verifier = webauthn) {
   async function authenticate(req, response) {
     const record = consume(req, 'authenticate');
     const key = typeof response?.id === 'string' && db.prepare('SELECT * FROM admin_passkeys WHERE id = ? AND rp_id = ?').get(response.id, record.rp_id);
-    if (!key || response.response?.userHandle !== key.user_handle) throw new Error('Nieznany klucz administratora.');
+    if (!key || response.response?.userHandle !== key.user_handle) throw new Error('Nieznany klucz dostępu administratora.');
     const result = await verifier.verifyAuthenticationResponse({ response, expectedChallenge: record.challenge,
       expectedOrigin: record.origin, expectedRPID: record.rp_id, requireUserVerification: true,
       credential: { id: key.id, publicKey: new Uint8Array(key.public_key), counter: key.counter, transports: JSON.parse(key.transports) } });
-    if (!result.verified) throw new Error('Nie udało się potwierdzić logowania passkey.');
+    if (!result.verified) throw new Error('Nie udało się potwierdzić logowania kluczem dostępu.');
     // A removed key or concurrent counter update must not issue a session.
     const changed = db.prepare('UPDATE admin_passkeys SET counter = ?, last_used_at = CURRENT_TIMESTAMP WHERE id = ? AND counter = ?')
       .run(result.authenticationInfo.newCounter, key.id, key.counter).changes;
-    if (!changed) throw new Error('Klucz został zmieniony. Ponów logowanie.');
+    if (!changed) throw new Error('Klucz dostępu został zmieniony. Spróbuj zalogować się ponownie.');
   }
   return { list, registrationOptions, register, authenticationOptions, authenticate };
 }

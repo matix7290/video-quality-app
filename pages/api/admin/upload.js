@@ -6,10 +6,10 @@ import { requireAdmin } from '../../../utils/admin-auth.cjs';
 import { stimulusInfo, validStimulusHeader } from '../../../utils/stimuli.cjs';
 export default async function handler(req, res) {
   if (!requireAdmin(req, res)) return;
-  if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
+  if (req.method !== 'POST') return res.status(405).json({ error: 'Ta operacja nie jest dostępna.' });
   try {
     const type = req.query?.type ?? 'video';
-    if (!['video', 'image'].includes(type)) throw new Error('Nieprawidłowy rodzaj stymulów.');
+    if (!['video', 'image'].includes(type)) throw new Error('Nieprawidłowy rodzaj bodźców.');
     const upload = multer({ dest: os.tmpdir(), limits: { fileSize: type === 'image' ? 50 * 1024 ** 2 : 2 * 1024 ** 3, files: 1, fields: 0 },
       fileFilter: (req, file, done) => {
         const info = stimulusInfo(file.originalname);
@@ -28,7 +28,7 @@ export default async function handler(req, res) {
     const target = path.join(directory, req.file.originalname);
     // COPYFILE_EXCL protects existing stimuli and sessions from overwritten content.
     try { await fs.promises.copyFile(req.file.path, target, fs.constants.COPYFILE_EXCL); }
-    catch (error) { if (error.code === 'EEXIST') return res.status(409).json({ error: `Plik ${req.file.originalname} już istnieje. Zmień nazwę przed importem.` }); throw error; }
+    catch (error) { if (error.code === 'EEXIST') return res.status(409).json({ error: `Plik ${req.file.originalname} już istnieje. Zmień nazwę pliku przed dodaniem.` }); throw error; }
     return res.status(201).json({ name: req.file.originalname });
   } catch (error) { return res.status(400).json({ error: error.message }); }
   finally { if (req.file?.path && fs.existsSync(req.file.path)) fs.unlinkSync(req.file.path); }
