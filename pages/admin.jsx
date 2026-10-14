@@ -157,6 +157,13 @@ export default function Admin() {
   const [loginCode, setLoginCode] = useState("");
   const [loginCodeRequired, setLoginCodeRequired] = useState(false);
   const [passwordProtected, setPasswordProtected] = useState(false);
+  const [passwordChangeOpen, setPasswordChangeOpen] = useState(false);
+  const [currentPassword, setCurrentPassword] = useState("");
+  const [newPassword, setNewPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
+  const [showPasswordFields, setShowPasswordFields] = useState(false);
+  const [passwordChangeError, setPasswordChangeError] = useState("");
+  const [passwordChangeStatus, setPasswordChangeStatus] = useState("");
   const [totpEnabled, setTotpEnabled] = useState(false);
   const [totpSetup, setTotpSetup] = useState(null);
   const [totpCode, setTotpCode] = useState("");
@@ -409,6 +416,35 @@ export default function Admin() {
       }
     } catch (e) {
       setTotpError(e.response?.data?.error || "Nie udało się zmienić ustawień weryfikacji dwuetapowej.");
+    } finally {
+      setBusy(false);
+    }
+  };
+  const resetPasswordChange = () => {
+    setCurrentPassword("");
+    setNewPassword("");
+    setConfirmPassword("");
+    setShowPasswordFields(false);
+    setPasswordChangeError("");
+    setPasswordChangeOpen(false);
+  };
+  const submitPasswordChange = async (event) => {
+    event.preventDefault();
+    setPasswordChangeError("");
+    setPasswordChangeStatus("");
+    if (newPassword !== confirmPassword) {
+      setPasswordChangeError("Nowe hasła nie są zgodne.");
+      return;
+    }
+    setBusy(true);
+    try {
+      await axios.post("/api/admin/password", { currentPassword, newPassword, confirmPassword });
+      resetPasswordChange();
+      setPasswordChangeStatus("Hasło zostało zmienione. Pozostałe sesje administratora wygasły.");
+    } catch (e) {
+      setCurrentPassword("");
+      setPasswordChangeError(e.response?.data?.error || "Nie udało się zmienić hasła. Spróbuj ponownie.");
+      if (e.response?.status === 401 && e.response.data?.passwordRequired) setAccess(e.response.data);
     } finally {
       setBusy(false);
     }
@@ -1716,6 +1752,36 @@ export default function Admin() {
             {tab === "access" && (
               <section className="admin-section">
                 <h2>{t("Dostęp do panelu")}</h2>
+                <h3 className="mt-5">{t("Hasło administratora")}</h3>
+                {!passwordProtected ? (
+                  <p className="admin-note">{t("Aby ustawić hasło po raz pierwszy, użyj polecenia npm run admin:password na serwerze.")}</p>
+                ) : (
+                  <div className="admin-password-change">
+                    <p className="admin-note">{t("Zmiana hasła wymaga obecnego hasła. Nowe hasło powinno mieć co najmniej 12 znaków. Po zmianie pozostałe sesje administratora wygasną.")}</p>
+                    {passwordChangeStatus && <p className="admin-message" role="status">{t(passwordChangeStatus)}</p>}
+                    {!passwordChangeOpen ? (
+                      <button type="button" className="admin-secondary" onClick={() => { setPasswordChangeStatus(""); setPasswordChangeOpen(true); }}>{t("Zmień hasło")}</button>
+                    ) : (
+                      <form onSubmit={submitPasswordChange} className="admin-password-change-form">
+                        <Field label={t("Obecne hasło")}>
+                          <input type={showPasswordFields ? "text" : "password"} autoComplete="current-password" value={currentPassword} onChange={(e) => setCurrentPassword(e.target.value)} required />
+                        </Field>
+                        <Field label={t("Nowe hasło")}>
+                          <input type={showPasswordFields ? "text" : "password"} autoComplete="new-password" minLength={12} value={newPassword} onChange={(e) => setNewPassword(e.target.value)} required />
+                        </Field>
+                        <Field label={t("Powtórz nowe hasło")}>
+                          <input type={showPasswordFields ? "text" : "password"} autoComplete="new-password" minLength={12} value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value)} required />
+                        </Field>
+                        <label className="admin-check"><input type="checkbox" checked={showPasswordFields} onChange={(e) => setShowPasswordFields(e.target.checked)} />{t("Pokaż hasła")}</label>
+                        {passwordChangeError && <p role="alert" className="admin-error">{t(passwordChangeError)}</p>}
+                        <div className="admin-actions">
+                          <button type="submit" className="admin-primary" disabled={busy}>{t("Zapisz nowe hasło")}</button>
+                          <button type="button" className="admin-small" onClick={resetPasswordChange}>{t("Anuluj")}</button>
+                        </div>
+                      </form>
+                    )}
+                  </div>
+                )}
                 <h3 className="mt-5">{t("Weryfikacja dwuetapowa (2FA)")}</h3>
                 <p className="admin-note">{t("Po włączeniu logowanie hasłem wymaga także sześciocyfrowego kodu z aplikacji uwierzytelniającej. Klucze dostępu działają bez kodu.")}</p>
                 {totpError && <p role="alert" className="admin-error">{t(totpError)}</p>}

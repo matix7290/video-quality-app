@@ -293,5 +293,22 @@
   "Weryfikacja dwuetapowa jest już włączona.": "Two-factor authentication is already enabled.",
   "Nieprawidłowy kod lub konfiguracja wygasła. Zacznij ponownie.": "Invalid code or expired setup. Start again.",
   "Najpierw ustaw hasło administratora.": "Set an admin password first.",
-  "Nieprawidłowa operacja.": "Invalid operation."
+  "Nieprawidłowa operacja.": "Invalid operation.",
+  "Aby ustawić hasło po raz pierwszy, użyj polecenia npm run admin:password na serwerze.": "To set a password for the first time, run npm run admin:password on the server.",
+  "Zmiana hasła wymaga obecnego hasła. Nowe hasło powinno mieć co najmniej 12 znaków. Po zmianie pozostałe sesje administratora wygasną.": "Changing your password requires your current password. The new password must be at least 12 characters. Other admin sessions will expire after the change.",
+  "Hasło zostało zmienione. Pozostałe sesje administratora wygasły.": "Password changed. Other admin sessions have expired.",
+  "Zmień hasło": "Change password",
+  "Obecne hasło": "Current password",
+  "Nowe hasło": "New password",
+  "Powtórz nowe hasło": "Confirm new password",
+  "Pokaż hasła": "Show passwords",
+  "Zapisz nowe hasło": "Save new password",
+  "Podaj obecne hasło.": "Enter your current password.",
+  "Nowe hasło musi mieć co najmniej 12 znaków i najwyżej 4096 bajtów.": "The new password must be at least 12 characters and at most 4096 bytes.",
+  "Nowe hasła nie są zgodne.": "New passwords do not match.",
+  "Nowe hasło musi różnić się od obecnego.": "The new password must differ from the current password.",
+  "Obecne hasło jest nieprawidłowe.": "The current password is incorrect.",
+  "Hasło zostało zmienione w międzyczasie. Zaloguj się ponownie.": "The password was changed in the meantime. Sign in again.",
+  "Nie udało się zmienić hasła. Spróbuj ponownie.": "Could not change the password. Please try again.",
+  "Trwa zmiana hasła. Spróbuj ponownie za chwilę.": "A password change is in progress. Please try again shortly."
 }

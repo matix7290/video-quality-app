@@ -25,9 +25,32 @@ async function verifyPassword(password, hash) {
 function passwordConfigured() {
   return ['ADMIN_PASSWORD', 'ADMIN_PASSWORD_HASH', 'ADMIN_SESSION_SECRET'].some(name => process.env[name] !== undefined);
 }
-function authConfiguration() {
+function baseConfiguration() {
   parseHash(process.env.ADMIN_PASSWORD_HASH);
   if (process.env.ADMIN_PASSWORD !== undefined || !/^[a-f0-9]{64}$/.test(process.env.ADMIN_SESSION_SECRET || '')) throw new Error(configurationError);
   return { hash: process.env.ADMIN_PASSWORD_HASH, secret: process.env.ADMIN_SESSION_SECRET };
 }
-module.exports = { hashPassword, verifyPassword, parseHash, passwordConfigured, authConfiguration };
+function baseId(base) {
+  return crypto.createHash('sha256').update(`${base.hash}:${base.secret}`).digest('hex');
+}
+function authConfiguration(db) {
+  const base = baseConfiguration();
+  const storage = db || require('../database');
+  const override = storage.prepare('SELECT password_hash FROM admin_password_override WHERE id = 1 AND base_id = ?').get(baseId(base));
+  if (!override) return base;
+  parseHash(override.password_hash);
+  return { hash: override.password_hash, secret: base.secret };
+}
+function changePasswordHash(db, expected, nextHash) {
+  parseHash(nextHash);
+  return db.transaction(() => {
+    const current = authConfiguration(db);
+    if (current.hash !== expected.hash || current.secret !== expected.secret) return false;
+    const base = baseConfiguration();
+    db.prepare(`INSERT INTO admin_password_override (id, base_id, password_hash) VALUES (1, ?, ?)
+      ON CONFLICT(id) DO UPDATE SET base_id = excluded.base_id, password_hash = excluded.password_hash,
+      changed_at = CURRENT_TIMESTAMP`).run(baseId(base), nextHash);
+    return true;
+  })();
+}
+module.exports = { hashPassword, verifyPassword, parseHash, passwordConfigured, authConfiguration, changePasswordHash };

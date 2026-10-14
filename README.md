@@ -224,9 +224,18 @@ kopii jawnego hasła. Pozostałe ustawienia pliku zostają zachowane. Stara konf
 niepoprawny hash nie umożliwiają logowania lub obejścia zabezpieczeń przez localhost.
 Dla hostingu skonfiguruj te same dwie zmienne w menedżerze sekretów i usuń `ADMIN_PASSWORD`.
 
-Po każdej zmianie uruchom ponownie serwer. Panel poprosi o hasło; logowanie wygasa po 8 godzinach.
-Zmiana hasła lub klucza sesji unieważnia istniejące logowania. Hasło zmieniasz tym samym
-poleceniem `npm run admin:password`; passkey pozostają zarejestrowane.
+Po każdej zmianie konfiguracji serwera uruchom go ponownie. Logowanie do panelu wygasa
+po 8 godzinach. Zalogowany administrator może zmienić hasło w zakładce **Dostęp**:
+podaje obecne hasło i dwukrotnie nowe (co najmniej 12 znaków). Nowy hash jest
+zapisywany w bazie SQLite i działa bez restartu, również gdy hasło startowe pochodzi
+z menedżera sekretów. Bieżąca przeglądarka otrzymuje nową sesję; pozostałe sesje
+wygasają. Klucze dostępu i konfiguracja 2FA pozostają aktywne.
+
+Polecenie `npm run admin:password` służy do ustawienia hasła startowego oraz
+odzyskania dostępu. Po zmianie konfiguracji serwera i restarcie nowe hasło startowe
+zastępuje hasło ustawione w panelu. Zachowaj bazę SQLite w kopiach zapasowych:
+zawiera hash hasła ustawionego w panelu. Zmiana klucza sesji unieważnia logowania;
+passkey pozostają zarejestrowane.
 Zmiana klucza sesji wyłącza wcześniejszą konfigurację 2FA; po ponownym zalogowaniu
 włącz ją ponownie w zakładce **Dostęp**.
 Przy wdrożeniu za reverse proxy używaj HTTPS oraz przekazuj `Host` i `X-Forwarded-Proto`.

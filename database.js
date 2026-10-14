@@ -136,4 +136,10 @@ db.exec(`
         pending_binding TEXT,
         pending_expires_at INTEGER
     );
+    CREATE TABLE IF NOT EXISTS admin_password_override (
+        id INTEGER PRIMARY KEY CHECK (id = 1),
+        base_id TEXT NOT NULL,
+        password_hash TEXT NOT NULL,
+        changed_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+    );
 `);

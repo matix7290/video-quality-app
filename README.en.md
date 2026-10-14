@@ -269,10 +269,19 @@ settings are preserved. An old configuration or invalid hash does not allow logi
 or a localhost authentication bypass. For hosting, configure the same two
 variables in your secrets manager and remove `ADMIN_PASSWORD`.
 
-Restart the server after each change. The panel will request a password; login
-expires after eight hours. Changing the password or session secret invalidates
-existing logins. Use `npm run admin:password` to change the password; registered
-passkeys are retained. When deploying behind a reverse proxy, use HTTPS and
+Restart the server after changing its credential configuration. Admin logins
+expire after eight hours. A signed-in administrator can change the password in
+the **Access** tab by entering the current password and the new password twice
+(at least 12 characters). The new hash is stored in SQLite and takes effect
+without a restart, including when the initial credentials come from a secrets
+manager. The current browser gets a fresh session; other sessions expire.
+Passkeys and configured 2FA remain active.
+
+Use `npm run admin:password` to set the initial password or recover access.
+After changing the server configuration and restarting, the new initial password
+replaces the password set in the panel. Include the SQLite database in backups:
+it contains the hash of the panel-set password. Changing the session secret
+invalidates logins; registered passkeys are retained. When deploying behind a reverse proxy, use HTTPS and
 forward `Host` and `X-Forwarded-Proto`. The panel blocks requests from other
 websites. Set a password when using a local reverse proxy as well.
 
