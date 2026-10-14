@@ -676,27 +676,6 @@ export default function Admin() {
           </h1>
           {access?.passwordRequired ? (
             <>
-              <p className="admin-note">
-                {t(
-                  "Zaloguj się hasłem albo wcześniej dodanym kluczem dostępu. Pierwszy klucz dostępu dodasz po zalogowaniu w zakładce Dostęp.",
-                )}
-              </p>
-              <button
-                className="admin-primary w-full mb-5"
-                onClick={loginWithPasskey}
-                disabled={busy || !passkeySupported}
-              >
-                {busy
-                  ? t("Oczekiwanie na potwierdzenie…")
-                  : t("Zaloguj się kluczem dostępu")}
-              </button>
-              {!passkeySupported && (
-                <p className="admin-note">
-                  {t(
-                    "Klucz dostępu wymaga obsługującej go przeglądarki. Otwórz panel pod adresem zaczynającym się od https:// albo na tym komputerze przez localhost.",
-                  )}
-                </p>
-              )}
               <form onSubmit={login}>
                 {loginCodeRequired ? (
                   <>
@@ -726,8 +705,8 @@ export default function Admin() {
                     />
                   </Field>
                 )}
-                <button className="study-button mt-4" disabled={busy}>
-                  {t(loginCodeRequired ? "Potwierdź kod i zaloguj się" : "Zaloguj się hasłem")}
+                <button type="submit" className="study-button w-full mt-4" disabled={busy}>
+                  {t(loginCodeRequired ? "Potwierdź kod i zaloguj się" : "Zaloguj")}
                 </button>
                 {loginCodeRequired && (
                   <button type="button" className="admin-small mt-4" disabled={busy} onClick={() => { setLoginCodeRequired(false); setPassword(""); setLoginCode(""); setError(""); }}>
@@ -735,6 +714,23 @@ export default function Admin() {
                   </button>
                 )}
               </form>
+              <button
+                type="button"
+                className="admin-primary admin-passkey-login w-full mt-5"
+                onClick={loginWithPasskey}
+                disabled={busy || !passkeySupported}
+              >
+                {busy
+                  ? t("Oczekiwanie na potwierdzenie…")
+                  : t("Zaloguj się kluczem dostępu")}
+              </button>
+              {!passkeySupported && (
+                <p className="admin-note">
+                  {t(
+                    "Klucz dostępu wymaga obsługującej go przeglądarki. Otwórz panel pod adresem zaczynającym się od https:// albo na tym komputerze przez localhost.",
+                  )}
+                </p>
+              )}
             </>
           ) : (
             <p>{t(access?.error || "Nie udało się wczytać ustawień.")}</p>

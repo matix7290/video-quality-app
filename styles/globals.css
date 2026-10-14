@@ -151,6 +151,8 @@ html:has(.admin-layout), body:has(.admin-layout) { overflow-x: clip; }
 .admin-primary, .admin-secondary { padding: 12px 18px; border-radius: 8px; font-size: 14px; font-weight: 600; display: inline-block; text-align: center; cursor: pointer; }
 .admin-primary { background: #2563eb; color: #fff; flex-shrink: 0; }
 .admin-primary:hover { background: #1d4ed8; }
+.admin-passkey-login { background: #047857; }
+.admin-passkey-login:hover:not(:disabled) { background: #065f46; }
 .admin-secondary { background: #243247; color: #e2e8f0; border: 1px solid #3a4b63; }
 .admin-secondary:hover { background: #334155; }
 .admin-summary { border: 1px solid #2d394c; border-radius: 12px; display: flex; gap: 24px; padding: 18px 24px; font-size: 13px; color: #94a3b8; flex-wrap: wrap; margin-bottom: 28px; }
