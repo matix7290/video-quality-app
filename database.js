@@ -127,4 +127,13 @@ db.exec(`
         session_binding TEXT,
         expires_at INTEGER NOT NULL
     );
+    CREATE TABLE IF NOT EXISTS admin_totp (
+        id INTEGER PRIMARY KEY CHECK (id = 1),
+        secret TEXT,
+        key_id TEXT,
+        last_counter INTEGER NOT NULL DEFAULT -1,
+        pending_secret TEXT,
+        pending_binding TEXT,
+        pending_expires_at INTEGER
+    );
 `);

@@ -154,7 +154,14 @@ export default function Admin() {
   const [error, setError] = useState("");
   const [access, setAccess] = useState(null);
   const [password, setPassword] = useState("");
+  const [loginCode, setLoginCode] = useState("");
+  const [loginCodeRequired, setLoginCodeRequired] = useState(false);
   const [passwordProtected, setPasswordProtected] = useState(false);
+  const [totpEnabled, setTotpEnabled] = useState(false);
+  const [totpSetup, setTotpSetup] = useState(null);
+  const [totpCode, setTotpCode] = useState("");
+  const [totpError, setTotpError] = useState("");
+  const [confirmTotpDisable, setConfirmTotpDisable] = useState(false);
   const [passkeySupported, setPasskeySupported] = useState(false);
   const [passkeys, setPasskeys] = useState([]);
   const [passkeyName, setPasskeyName] = useState("");
@@ -312,8 +319,14 @@ export default function Admin() {
     setBusy(true);
     setError("");
     try {
-      await axios.post("/api/admin/auth", { password });
+      const { data } = await axios.post("/api/admin/auth", { password, code: loginCodeRequired ? loginCode.trim() : undefined });
+      if (data.codeRequired) {
+        setLoginCodeRequired(true);
+        return;
+      }
       setPassword("");
+      setLoginCode("");
+      setLoginCodeRequired(false);
       await load();
     } catch (e) {
       setError(
@@ -340,6 +353,9 @@ export default function Admin() {
   const loginWithPasskey = async () => {
     setBusy(true);
     setError("");
+    setPassword("");
+    setLoginCode("");
+    setLoginCodeRequired(false);
     try {
       const { data: optionsJSON } = await axios.post("/api/admin/passkeys", {
         action: "authenticate-options",
@@ -367,6 +383,34 @@ export default function Admin() {
         e.response?.data?.error || "Nie udało się wczytać kluczy dostępu.",
       );
       if (e.response?.status === 401) setAccess(e.response.data);
+    }
+  };
+  const loadTotp = async () => {
+    setTotpError("");
+    try {
+      const { data } = await axios.get("/api/admin/totp");
+      setTotpEnabled(data.enabled);
+    } catch (e) {
+      setTotpError(e.response?.data?.error || "Nie udało się wczytać ustawień weryfikacji dwuetapowej.");
+    }
+  };
+  const changeTotp = async (action) => {
+    setBusy(true);
+    setTotpError("");
+    try {
+      const { data } = await axios.post("/api/admin/totp", { action, code: totpCode.trim() });
+      if (action === "start") setTotpSetup(data);
+      else {
+        setTotpEnabled(data.enabled);
+        setTotpSetup(null);
+        setTotpCode("");
+        setConfirmTotpDisable(false);
+        setMessage(action === "activate" ? "Weryfikacja dwuetapowa włączona dla logowania hasłem." : "Weryfikacja dwuetapowa wyłączona.");
+      }
+    } catch (e) {
+      setTotpError(e.response?.data?.error || "Nie udało się zmienić ustawień weryfikacji dwuetapowej.");
+    } finally {
+      setBusy(false);
     }
   };
   const addPasskey = async () => {
@@ -654,18 +698,42 @@ export default function Admin() {
                 </p>
               )}
               <form onSubmit={login}>
-                <Field label={t("Hasło administratora")}>
-                  <input
-                    type="password"
-                    autoComplete="current-password"
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
-                    required
-                  />
-                </Field>
+                {loginCodeRequired ? (
+                  <>
+                    <p className="admin-note">{t("Hasło jest poprawne. Wpisz kod z aplikacji uwierzytelniającej.")}</p>
+                    <Field label={t("Kod z aplikacji uwierzytelniającej")}>
+                      <input
+                        type="text"
+                        inputMode="numeric"
+                        autoComplete="one-time-code"
+                        pattern="[0-9]{6}"
+                        maxLength={6}
+                        value={loginCode}
+                        onChange={(e) => setLoginCode(e.target.value.replace(/\D/g, ""))}
+                        required
+                        autoFocus
+                      />
+                    </Field>
+                  </>
+                ) : (
+                  <Field label={t("Hasło administratora")}>
+                    <input
+                      type="password"
+                      autoComplete="current-password"
+                      value={password}
+                      onChange={(e) => setPassword(e.target.value)}
+                      required
+                    />
+                  </Field>
+                )}
                 <button className="study-button mt-4" disabled={busy}>
-                  {t("Zaloguj się hasłem")}
+                  {t(loginCodeRequired ? "Potwierdź kod i zaloguj się" : "Zaloguj się hasłem")}
                 </button>
+                {loginCodeRequired && (
+                  <button type="button" className="admin-small mt-4" disabled={busy} onClick={() => { setLoginCodeRequired(false); setPassword(""); setLoginCode(""); setError(""); }}>
+                    {t("Wpisz hasło ponownie")}
+                  </button>
+                )}
               </form>
             </>
           ) : (
@@ -710,7 +778,7 @@ export default function Admin() {
                     if (key === "results") showResults();
                     else {
                       setTab(key);
-                      if (key === "access") loadPasskeys();
+                      if (key === "access") { loadPasskeys(); loadTotp(); }
                     }
                   }}
                 >
@@ -1652,6 +1720,39 @@ export default function Admin() {
             {tab === "access" && (
               <section className="admin-section">
                 <h2>{t("Dostęp do panelu")}</h2>
+                <h3 className="mt-5">{t("Weryfikacja dwuetapowa (2FA)")}</h3>
+                <p className="admin-note">{t("Po włączeniu logowanie hasłem wymaga także sześciocyfrowego kodu z aplikacji uwierzytelniającej. Klucze dostępu działają bez kodu.")}</p>
+                {totpError && <p role="alert" className="admin-error">{t(totpError)}</p>}
+                {!passwordProtected ? (
+                  <p className="admin-note">{t("Najpierw ustaw hasło administratora, aby włączyć 2FA.")}</p>
+                ) : totpEnabled ? (
+                  <div className="admin-totp-settings">
+                    <p className="admin-message">{t("2FA jest włączone dla logowania hasłem.")}</p>
+                    {!confirmTotpDisable ? (
+                      <button type="button" className="admin-danger" onClick={() => setConfirmTotpDisable(true)}>{t("Wyłącz 2FA")}</button>
+                    ) : (
+                      <>
+                        <Field label={t("Aktualny kod z aplikacji")}><input type="text" inputMode="numeric" autoComplete="one-time-code" pattern="[0-9]{6}" maxLength={6} value={totpCode} onChange={(e) => setTotpCode(e.target.value.replace(/\D/g, ""))} /></Field>
+                        <div className="admin-actions"><button type="button" className="admin-danger" disabled={busy || totpCode.length !== 6} onClick={() => changeTotp("disable")}>{t("Potwierdź wyłączenie 2FA")}</button><button type="button" className="admin-small" onClick={() => { setConfirmTotpDisable(false); setTotpCode(""); }}>{t("Anuluj")}</button></div>
+                      </>
+                    )}
+                  </div>
+                ) : (
+                  <div className="admin-totp-settings">
+                    {!totpSetup ? (
+                      <button type="button" className="admin-primary" disabled={busy} onClick={() => changeTotp("start")}>{t("Skonfiguruj 2FA")}</button>
+                    ) : (
+                      <>
+                        <p className="admin-note">{t("Dodaj konto w aplikacji uwierzytelniającej, wpisując poniższy klucz. Następnie potwierdź konfigurację kodem z aplikacji. Klucz jest widoczny tylko teraz.")}</p>
+                        <p className="admin-totp-secret"><code>{totpSetup.secret}</code></p>
+                        <a className="admin-link" href={totpSetup.uri}>{t("Otwórz w aplikacji uwierzytelniającej")}</a>
+                        <Field label={t("Kod potwierdzający")}><input type="text" inputMode="numeric" autoComplete="one-time-code" pattern="[0-9]{6}" maxLength={6} value={totpCode} onChange={(e) => setTotpCode(e.target.value.replace(/\D/g, ""))} /></Field>
+                        <div className="admin-actions"><button type="button" className="admin-primary" disabled={busy || totpCode.length !== 6} onClick={() => changeTotp("activate")}>{t("Włącz 2FA")}</button><button type="button" className="admin-small" onClick={() => { setTotpSetup(null); setTotpCode(""); }}>{t("Anuluj")}</button></div>
+                      </>
+                    )}
+                  </div>
+                )}
+                <h3 className="mt-5">{t("Klucze dostępu")}</h3>
                 <p className="admin-note">
                   {t(
                     "Klucz dostępu umożliwia logowanie bez wpisywania hasła, np. za pomocą odcisku palca, kodu PIN lub telefonu. Nadal możesz zalogować się hasłem administratora.",

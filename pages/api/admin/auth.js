@@ -1,5 +1,8 @@
 import { sameOrigin, loginCookie, cookie, authenticated, hasPasskeys } from '../../../utils/admin-auth.cjs';
 import { passwordConfigured, authConfiguration, verifyPassword } from '../../../utils/admin-password.cjs';
+import db from '../../../database';
+import { createTotpService } from '../../../utils/admin-totp.cjs';
+const totp = createTotpService(db);
 const attempts = new Map();
 let verifying = false;
 export default async function handler(req, res) {
@@ -29,6 +32,10 @@ export default async function handler(req, res) {
     // Never issue a cookie if credentials were changed while verification was running.
     const current = authConfiguration();
     if (current.hash !== configuration.hash || current.secret !== configuration.secret) return res.status(503).json({ error: 'Ustawienia logowania zmieniły się. Spróbuj ponownie.' });
+    if (totp.enabled()) {
+      if (!req.body?.code) return res.status(202).json({ codeRequired: true });
+      if (!totp.verify(req.body.code)) return res.status(401).json({ error: 'Nieprawidłowy lub wykorzystany kod uwierzytelniający.' });
+    }
     attempts.delete(key);
     res.setHeader('Set-Cookie', loginCookie(req));
     return res.json({ ok: true });

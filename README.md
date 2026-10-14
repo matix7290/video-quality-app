@@ -227,11 +227,24 @@ Dla hostingu skonfiguruj te same dwie zmienne w menedżerze sekretów i usuń `A
 Po każdej zmianie uruchom ponownie serwer. Panel poprosi o hasło; logowanie wygasa po 8 godzinach.
 Zmiana hasła lub klucza sesji unieważnia istniejące logowania. Hasło zmieniasz tym samym
 poleceniem `npm run admin:password`; passkey pozostają zarejestrowane.
+Zmiana klucza sesji wyłącza wcześniejszą konfigurację 2FA; po ponownym zalogowaniu
+włącz ją ponownie w zakładce **Dostęp**.
 Przy wdrożeniu za reverse proxy używaj HTTPS oraz przekazuj `Host` i `X-Forwarded-Proto`.
 Panel blokuje żądania z obcych stron. Ustaw hasło również przy lokalnym reverse proxy.
 
 Możliwe kolejne rozszerzenia: klipy treningowe, przerwy między blokami,
 przywracanie zapisanych wersji konfiguracji oraz ustawienia zakończenia w Prolific.
+
+### Weryfikacja dwuetapowa (2FA)
+
+Po zalogowaniu otwórz zakładkę **Dostęp** i wybierz **Skonfiguruj 2FA**. Dodaj konto
+w aplikacji uwierzytelniającej za pomocą wyświetlonego klucza lub odnośnika
+`otpauth://`, a następnie potwierdź sześciocyfrowym kodem. Klucz jest wyświetlany
+tylko podczas konfiguracji. Odtąd panel prosi o kod z aplikacji po sprawdzeniu hasła.
+Klucze dostępu nadal umożliwiają logowanie bez kodu. Kod jest jednorazowy;
+serwer akceptuje przesunięcie zegara o jeden 30-sekundowy okres. Wyłączenie 2FA
+wymaga aktualnego kodu. Sekret w bazie SQLite jest zaszyfrowany kluczem pochodzącym
+z `ADMIN_SESSION_SECRET`. Zachowaj kopię bazy i zabezpiecz klucz sesji.
 
 ### Logowanie passkey (WebAuthn)
 

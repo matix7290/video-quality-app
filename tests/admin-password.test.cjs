@@ -76,7 +76,7 @@ test('Next.js dotenv expansion keeps the effective existing password after migra
 test('password API verifies the hash, rate limits requests and exposes no stored credentials', async () => {
   process.env.ADMIN_PASSWORD_HASH = hash; process.env.ADMIN_SESSION_SECRET = 'ab'.repeat(32);
   const source = fs.readFileSync(path.join(root, 'pages/api/admin/auth.js'), 'utf8').replace(/^import .*;\n/gm, '').replace('export default ', '').replace(/^export const config.*$/gm, '');
-  const dependencies = { ...auth, passwordConfigured, authConfiguration, verifyPassword };
+  const dependencies = { ...auth, passwordConfigured, authConfiguration, verifyPassword, db: {}, createTotpService: () => ({ enabled: () => false }) };
   const handler = new Function(...Object.keys(dependencies), `${source}; return handler;`)(...Object.values(dependencies));
   async function call(password, address = '127.0.0.1', method = 'POST') {
     const res = { statusCode: 200, headers: {}, status(code) { this.statusCode = code; return this; }, setHeader(name, value) { this.headers[name] = value; }, json(body) { this.body = body; return this; } };
