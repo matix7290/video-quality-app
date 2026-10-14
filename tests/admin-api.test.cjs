@@ -5,6 +5,7 @@ const path = require('node:path');
 const os = require('node:os');
 const { PassThrough } = require('node:stream');
 const { streamResultsCsv } = require('../utils/results-csv.cjs');
+const { streamResultsDatabase } = require('../utils/results-db.cjs');
 const multer = require('multer');
 const { requireAdmin } = require('../utils/admin-auth.cjs');
 const { stimulusInfo, validStimulusHeader } = require('../utils/stimuli.cjs');
@@ -159,4 +160,70 @@ test('rating and answer exports identify image stimuli while preserving historic
     assert.equal(row[header.indexOf('video_name')], 'photo.png');
     assert.equal(row[header.indexOf('phase_position')], '1');
   }
+});
+
+test('deleting all results requires admin confirmation and clears participant data only', async () => {
+  const handler = load('admin/results.js', { db, requireAdmin, streamResultsCsv });
+  fs.mkdirSync('config', { recursive: true });
+  fs.writeFileSync('config/study.json', '{"settings":"unchanged"}');
+  db.prepare("INSERT INTO screentests (session_id) VALUES ('screen-only')").run();
+  db.prepare("INSERT INTO screentests (session_id, user_id) VALUES ('image-export', ?)")
+    .run(db.prepare("SELECT id FROM users WHERE session_id = 'image-export'").get().id);
+  const before = Object.fromEntries(['users', 'ratings', 'control_answers', 'screentests'].map(table => [table, db.prepare(`SELECT COUNT(*) AS n FROM ${table}`).get().n]));
+  assert.ok(Object.values(before).every(count => count > 0));
+
+  let res = response();
+  await handler({ ...local(), method: 'DELETE', body: { confirmation: 'DELETE_ALL_RESULTS' }, socket: { remoteAddress: '192.0.2.1' } }, res);
+  assert.equal(res.statusCode, 401);
+  res = response();
+  await handler({ ...local(), method: 'DELETE', body: {} }, res);
+  assert.equal(res.statusCode, 400);
+  for (const [table, count] of Object.entries(before)) assert.equal(db.prepare(`SELECT COUNT(*) AS n FROM ${table}`).get().n, count);
+
+  res = response();
+  await handler({ ...local(), method: 'DELETE', body: { confirmation: 'DELETE_ALL_RESULTS' } }, res);
+  assert.equal(res.statusCode, 200);
+  assert.deepEqual(res.body, { sessions: 0, completed: 0, ratings: 0, answers: 0 });
+  for (const table of Object.keys(before)) assert.equal(db.prepare(`SELECT COUNT(*) AS n FROM ${table}`).get().n, 0);
+  assert.equal(fs.readFileSync('config/study.json', 'utf8'), '{"settings":"unchanged"}');
+  assert.equal(fs.existsSync('public/videos/fixture.mp4'), true);
+});
+
+test('SQLite export contains all result tables and omits administrator tables and their data', async () => {
+  const Database = require('better-sqlite3');
+  const user = db.prepare("INSERT INTO users (session_id, auto_fullscreen, client_info, playlist) VALUES ('database-export', 0, '{}', '[]')").run().lastInsertRowid;
+  const rating = db.prepare("INSERT INTO ratings (user_id, video_name, clip_name, rating) VALUES (?, 'fixture.mp4', 'fixture', 4)").run(user).lastInsertRowid;
+  db.prepare("INSERT INTO control_answers (rating_id, question_id, question, answer) VALUES (?, 'q1', 'Test?', 1)").run(rating);
+  db.prepare("INSERT INTO screentests (session_id, user_id) VALUES ('database-export', ?)").run(user);
+  const secret = 'administrator-secret-marker-12345';
+  db.prepare("INSERT INTO admin_webauthn_challenges (token_hash, kind, challenge, origin, rp_id, expires_at) VALUES ('token', 'register', ?, 'http://localhost:3000', 'localhost', 9999999999999)").run(secret);
+
+  const handler = load('admin/results.js', { db, requireAdmin, streamResultsCsv, streamResultsDatabase });
+  let res = response();
+  await handler({ ...local(), socket: { remoteAddress: '192.0.2.1' }, query: { type: 'database' } }, res);
+  assert.equal(res.statusCode, 401);
+
+  res = response();
+  const chunks = [];
+  res.on('data', chunk => chunks.push(chunk));
+  await handler({ ...local(), query: { type: 'database', complete: '1' } }, res);
+  assert.equal(res.statusCode, 200);
+  assert.equal(res.headers['Content-Type'], 'application/vnd.sqlite3');
+  assert.match(res.headers['Content-Disposition'], /study-results\.sqlite/);
+  const bytes = Buffer.concat(chunks);
+  assert.equal(res.headers['Content-Length'], bytes.length);
+  assert.equal(bytes.subarray(0, 16).toString(), 'SQLite format 3\u0000');
+  assert.equal(bytes.includes(Buffer.from(secret)), false);
+  fs.writeFileSync('exported-results.sqlite', bytes);
+  const exported = new Database('exported-results.sqlite', { readonly: true, fileMustExist: true });
+  try {
+    assert.deepEqual(exported.prepare("SELECT name FROM sqlite_master WHERE type = 'table' AND name NOT LIKE 'sqlite_%' ORDER BY name").all().map(row => row.name),
+      ['control_answers', 'ratings', 'screentests', 'users']);
+    for (const table of ['users', 'ratings', 'control_answers', 'screentests']) {
+      assert.equal(exported.prepare(`SELECT COUNT(*) AS n FROM ${table}`).get().n, 1);
+    }
+    assert.equal(exported.prepare('SELECT end_time FROM users').get().end_time, null);
+    assert.equal(exported.pragma('integrity_check', { simple: true }), 'ok');
+  } finally { exported.close(); }
+  assert.equal(db.prepare('SELECT challenge FROM admin_webauthn_challenges').get().challenge, secret);
 });
