@@ -170,8 +170,14 @@ html:has(.admin-layout), body:has(.admin-layout) { overflow-x: clip; }
 .admin-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 24px; }
 .admin-field { display: flex; flex-direction: column; gap: 9px; font-size: 14px; min-width: 0; }
 .admin-field > span { font-weight: 600; color: #cbd5e1; }
+.admin-field > label { font-weight: 600; color: #cbd5e1; }
 .admin-field small { color: #94a3b8; }
 .admin-field input, .admin-field textarea, .admin-field select, .admin-actions select { background: #111b2d; border: 1px solid #3a4b63; padding: 11px 12px; border-radius: 8px; color: #f8fafc; width: 100%; font: inherit; }
+.admin-color-controls { display: flex; align-items: center; gap: 10px; }
+.admin-color-controls input[type="color"] { width: 46px; height: 46px; flex: 0 0 46px; padding: 4px; cursor: pointer; }
+.admin-color-controls .admin-color-hex { width: 160px; max-width: calc(100% - 56px); height: 46px; border-radius: 12px; text-align: center; font-size: 18px; font-weight: 600; font-variant-numeric: tabular-nums; }
+.admin-color-controls .admin-color-hex[aria-invalid="true"] { border-color: #f87171; }
+.admin-field .admin-color-error { color: #fca5a5; }
 .admin-field-muted { opacity: .5; }
 .admin-field-muted input:disabled { background: #1b2432; border-color: #303b4b; color: #94a3b8; cursor: not-allowed; }
 .admin-actions select { width: auto; max-width: 100%; }

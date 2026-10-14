@@ -7,9 +7,10 @@ export default function StartScreen({
   disabled,
   error,
   mode = "both",
+  backgroundColor,
 }) {
   return (
-    <main className="study-background study-surface">
+    <main className="study-background study-surface" style={backgroundColor ? { '--background': backgroundColor } : undefined}>
       <section className="study-card study-welcome-card">
         <header className="study-welcome-header">
           <span className="study-mark" aria-hidden="true">VQ</span>

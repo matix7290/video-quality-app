@@ -225,6 +225,7 @@ export default function Home({ initialSettings }) {
         endScreen={endScreen}
         trans={trans}
         mode={settings.mode}
+        backgroundColor={settings.backgroundColor}
         isFullscreen={isFullscreen}
         onStart={startAssessment}
         disabled={starting || !sessionId}
@@ -244,7 +245,7 @@ export default function Home({ initialSettings }) {
 
   if (phaseIntro) {
     return (
-      <main className="study-background">
+      <main className="study-background" style={{ '--background': settings.backgroundColor }}>
         <section className="study-card text-center">
           <h1 className="text-2xl font-bold">{trans(introKeys.title)}</h1>
           <p className="study-description mb-6 whitespace-pre-line">{trans(introKeys.instruction)}</p>
@@ -255,7 +256,7 @@ export default function Home({ initialSettings }) {
   }
 
   return (
-    <div className="study-background">
+    <div className="study-background" style={{ '--background': settings.backgroundColor }}>
       {!showRating && imageStudy && videoList[currentVideoIndex] && (
         <ImageStimulus key={`${phase}-${currentVideoIndex}`} src={videoList[currentVideoIndex]}
           duration={settings.imageDuration} autoFullscreen={autoFullscreen} onComplete={handleVideoEnd} trans={trans} />

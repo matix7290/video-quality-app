@@ -22,6 +22,12 @@ const textFields = [['welcome', 'Tytuł powitania'], ['instruction', 'Instrukcja
 const modes = { both: 'Obie skale — dwie części', standard: 'Tylko skala z przyciskami (1–5)', slider: 'Tylko skala z suwakiem (1–5)' };
 const questionParts = { first: 'Pierwsza część', second: 'Druga część', both: 'Obie części' };
 const phaseOrders = { 'standard-first': 'Najpierw przyciski, potem suwak', 'slider-first': 'Najpierw suwak, potem przyciski', balanced: 'Na zmianę między uczestnikami (50/50)' };
+const hexColor = /^#[0-9a-f]{6}$/i;
+function colorText(background) {
+  const channels = background.slice(1).match(/.{2}/g).map(channel => parseInt(channel, 16) / 255);
+  const luminance = channels.map(channel => channel <= 0.04045 ? channel / 12.92 : ((channel + 0.055) / 1.055) ** 2.4);
+  return 0.2126 * luminance[0] + 0.7152 * luminance[1] + 0.0722 * luminance[2] > 0.179 ? '#111827' : '#ffffff';
+}
 function Field({ label, children, hint, muted = false }) { return <label className={`admin-field${muted ? ' admin-field-muted' : ''}`}><span>{label}</span>{children}{hint && <small>{hint}</small>}</label>; }
 function download(filename, data, type) {
   const url = URL.createObjectURL(new Blob([data], { type }));
@@ -44,6 +50,8 @@ export default function Admin() {
   };
 
   const [settings, setSettings] = useState(null);
+  const [backgroundColorDraft, setBackgroundColorDraft] = useState('');
+  const backgroundColorInvalid = !hexColor.test(backgroundColorDraft);
   const [catalog, setCatalog] = useState([]);
   const [selectionsByType, setSelectionsByType] = useState({});
   const activeCatalog = catalog.filter(file => file.type === (settings?.stimulusType || 'video'));
@@ -83,6 +91,7 @@ export default function Admin() {
     try {
       const { data } = await axios.get('/api/admin/config');
       setSettings({ ...data.settings, selectedVideos: data.settings.selectedVideos || data.catalog.filter(file => file.type === data.settings.stimulusType).map(file => file.name) });
+      setBackgroundColorDraft(data.settings.backgroundColor);
       setSelectionsByType({});
       setCatalog(data.catalog); setVersion(data.version); setPasswordProtected(data.passwordProtected);
       try { setQuestions(questionRows(data.questionsCsv, data.catalog.map(file => file.name))); setRawCsv(null); }
@@ -109,6 +118,13 @@ export default function Admin() {
     return () => window.removeEventListener('beforeunload', warn);
   }, [dirty]);
   const change = patch => { setSettings(previous => ({ ...previous, ...patch })); setDirty(true); setMessage(''); };
+  const changeBackgroundColor = value => {
+    setBackgroundColorDraft(value);
+    setDirty(true);
+    setMessage('');
+    setError('');
+    if (hexColor.test(value)) setSettings(previous => ({ ...previous, backgroundColor: value }));
+  };
   const changeStimulusType = type => {
     setSelectionsByType(previous => ({ ...previous, [settings.stimulusType]: settings.selectedVideos }));
     setSelectedPreview('');
@@ -121,10 +137,11 @@ export default function Admin() {
     if (e.response?.status === 401) setAccess(e.response.data);
   };
   const save = async () => {
+    if (backgroundColorInvalid) { setTab('flow'); setError('Wpisz kolor tła w formacie #RRGGBB.'); return; }
     setBusy(true); setError(''); setMessage('');
     try {
       const { data } = await axios.put('/api/admin/config', { settings, questionsCsv: rawCsv ?? questionsToCsv(questions, settings) });
-      setSettings(data.settings); setVersion(data.version); setDirty(false);
+      setSettings(data.settings); setBackgroundColorDraft(data.settings.backgroundColor); setVersion(data.version); setDirty(false);
       setQuestions(questionRows(data.questionsCsv, data.catalog.map(file => file.name))); setRawCsv(null);
       setMessage('Ustawienia zapisane. Będą używane przez osoby rozpoczynające badanie.');
     } catch (e) { fail(e); } finally { setBusy(false); }
@@ -259,6 +276,11 @@ export default function Admin() {
           <Field label={t("Krok suwaka")} hint={t("Najmniejsza zmiana oceny na suwaku.")}><select value={settings.sliderStep} disabled={settings.mode === 'standard'} onChange={e => change({ sliderStep: Number(e.target.value) })}>{[0.01, 0.1, 0.25, 0.5, 1].map(step => <option key={step} value={step}>{step.toLocaleString(adminLocale)}</option>)}</select></Field>
           <Field label={t("Kolejność bodźców")}><select value={String(settings.randomize)} onChange={e => change({ randomize: e.target.value === 'true' })}><option value="true">{t("Losowa dla każdego uczestnika")}</option><option value="false">{t("Według kolejności wyboru bodźców")}</option></select></Field>
           <Field label={t("Czas wyświetlania zdjęcia (s)")} muted={!imageStudy} hint={t("Od 0,5 do 300 sekund. Czas jest liczony od wczytania zdjęcia. Potem pojawia się skala oceny.")}><input type="number" min="0.5" max="300" step="0.1" disabled={!imageStudy} value={settings.imageDuration} onChange={e => change({ imageDuration: e.target.value === '' ? '' : Number(e.target.value) })} /></Field>
+          <div className="admin-field admin-color-field"><label htmlFor="study-background-hex">{t("Kolor tła strony testu")}</label>
+            <div className="admin-color-controls"><input type="color" aria-label={t("Wybierz kolor tła")} value={settings.backgroundColor} onChange={e => changeBackgroundColor(e.target.value)} />
+              <input id="study-background-hex" className="admin-color-hex" type="text" value={backgroundColorDraft} maxLength={7} spellCheck={false} autoComplete="off" aria-invalid={backgroundColorInvalid} aria-describedby="study-background-hint" style={{ backgroundColor: settings.backgroundColor, color: colorText(settings.backgroundColor) }} onChange={e => changeBackgroundColor(e.target.value)} /></div>
+            <small id="study-background-hint" className={backgroundColorInvalid ? 'admin-color-error' : ''}>{backgroundColorInvalid ? t("Wpisz kolor tła w formacie #RRGGBB.") : t("Kolor tła widoczny podczas badania. Sprawdź go w zakładce Podgląd.")}</small>
+          </div>
         </div><label className="admin-check"><input type="checkbox" checked={settings.screenTest} onChange={e => change({ screenTest: e.target.checked })} />{t("Test ekranu przed oceną bodźców")}</label>
         <label className="admin-check"><input type="checkbox" checked={settings.autoFullscreen} onChange={e => change({ autoFullscreen: e.target.checked })} />{t("Automatyczny tryb pełnoekranowy")}</label>
         <p className="admin-note">{t("Automatycznie wyświetla bodźce na pełnym ekranie, jeśli urządzenie obsługuje tę funkcję. Ustawienie dotyczy wszystkich osób rozpoczynających badanie.")}</p>
@@ -278,7 +300,7 @@ export default function Admin() {
         </section>}
         {tab === 'preview' && <section className="admin-section"><h2>{t("Podgląd ekranów")}</h2><p className="admin-note">{t("Podgląd pokazuje ekrany zgodnie z bieżącymi ustawieniami. Oglądanie podglądu nie jest zapisywane jako udział w badaniu, a wybrane oceny nie trafiają do wyników.")}</p><div className="admin-actions mb-5"><select aria-label={t("Ekran podglądu")} value={previewScreen} onChange={e => { setPreviewScreen(e.target.value); setPreviewRating(null); }}><option value="start">{t("Powitanie")}</option>{settings.mode !== 'slider' && <option value="standard">{t("Skala z przyciskami")}</option>}{settings.mode !== 'standard' && <option value="slider">{t("Skala z suwakiem")}</option>}{settings.mode === 'both' && <option value="intro">{t("Przejście między częściami")}</option>}<option value="end">{t("Podziękowanie")}</option></select><select aria-label={t("Język podglądu")} value={locale} onChange={e => setLocale(e.target.value)}><option value="pl">{t("Polski")}</option><option value="en">{t("Angielski")}</option></select></div>
           {settings.mode === 'both' && settings.phaseOrder === 'balanced' && <Field label={t("Kolejność w podglądzie")} hint={t("Wybór w podglądzie nie zmienia kolejności skal przydzielanej uczestnikom.")}><select value={previewFirstPhase} onChange={e => setPreviewFirstPhase(e.target.value)}><option value="standard">{t("Przyciski → suwak")}</option><option value="slider">{t("Suwak → przyciski")}</option></select></Field>}
-          <div className="admin-preview" lang={locale}>{['start', 'end'].includes(previewScreen) ? <StartScreen endScreen={previewScreen === 'end'} trans={trans} mode={settings.mode} disabled onStart={() => {}} /> : previewScreen === 'intro' ? <div className="study-background"><section className="study-card text-center"><h1 className="text-2xl font-bold">{trans(previewIntroKeys.title)}</h1><p className="study-description mb-6 whitespace-pre-line">{trans(previewIntroKeys.instruction)}</p><button className="study-button" disabled>{trans('start_part_two')}</button></section></div> : <RatingPanel key={`${previewScreen}-${locale}`} trans={trans} scale={previewScreen} labels={settings.labels[locale]} sliderStep={settings.sliderStep} onChoose={value => setPreviewRating(value)} />}</div>
+          <div className="admin-preview" lang={locale} style={{ '--background': settings.backgroundColor }}>{['start', 'end'].includes(previewScreen) ? <StartScreen endScreen={previewScreen === 'end'} trans={trans} mode={settings.mode} disabled onStart={() => {}} /> : previewScreen === 'intro' ? <div className="study-background"><section className="study-card text-center"><h1 className="text-2xl font-bold">{trans(previewIntroKeys.title)}</h1><p className="study-description mb-6 whitespace-pre-line">{trans(previewIntroKeys.instruction)}</p><button className="study-button" disabled>{trans('start_part_two')}</button></section></div> : <RatingPanel key={`${previewScreen}-${locale}`} trans={trans} scale={previewScreen} labels={settings.labels[locale]} sliderStep={settings.sliderStep} onChoose={value => setPreviewRating(value)} />}</div>
           {previewRating !== null && <p className="admin-message">{t("Wybrana ocena w podglądzie: {rating}. Nie została zapisana.", { rating: previewRating })}</p>}
         </section>}
         {tab === 'results' && <section className="admin-section"><h2>{t("Wyniki badania")}</h2><p className="admin-note">{t("Pobrane pliki zawierają dotychczas zebrane wyniki. Kolumna study_version wskazuje wersję ustawień badania.")}</p>{stats && <div className="admin-stat-grid">{[['sessions', t('Rozpoczęte badania')], ['completed', t('Ukończone badania')], ['ratings', t('Oceny')], ['answers', t('Odpowiedzi na pytania kontrolne')]].map(([key, label]) => <div key={key}><strong>{stats[key]}</strong><span>{t(label)}</span></div>)}</div>}<label className="admin-check"><input type="checkbox" checked={completeOnly} onChange={e => setCompleteOnly(e.target.checked)} />{t("Pobierz tylko wyniki ukończonych badań")}</label><div className="admin-actions"><button className="admin-secondary" onClick={() => exportResults('ratings')}>{t("Pobierz oceny w CSV")}</button><button className="admin-secondary" onClick={() => exportResults('answers')}>{t("Pobierz odpowiedzi w CSV")}</button><button className="admin-small" onClick={showResults}>{t("Odśwież statystyki")}</button></div></section>}

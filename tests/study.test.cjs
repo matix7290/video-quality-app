@@ -125,25 +125,30 @@ test('two-stage session saves decimals and answers atomically, supports retry, a
 
 test('saved configurations select stimuli, validate missing files and protect sessions from later edits', () => {
   const filenames = ['a_vmaf_80.mp4', 'b clip.mp4'];
-  const initial = { ...configuration.defaults(), selectedVideos: filenames };
+  const initial = { ...configuration.defaults(), selectedVideos: filenames, backgroundColor: '#234567' };
   const csv = fs.readFileSync('config/control-questions.csv', 'utf8');
   configuration.writeConfiguration(configuration.validateConfig(initial, filenames), csv);
   const manifest = study.readStudy();
   assert.equal(manifest.videos[0], '/api/stimuli/a_vmaf_80.mp4');
+  assert.equal(manifest.settings.backgroundColor, '#234567');
   const session = { sessionId: 'snapshot-session', videoOrder: manifest.videos, configVersion: manifest.settings.version, clientInfo: {}, autoFullscreen: 0 };
   assert.equal(call('create-user.js', session).statusCode, 201);
-  configuration.writeConfiguration({ ...initial, mode: 'standard', selectedVideos: ['b clip.mp4'] }, 'video_name,question,correct_answer\n');
+  configuration.writeConfiguration({ ...initial, mode: 'standard', backgroundColor: '#345678', selectedVideos: ['b clip.mp4'] }, 'video_name,question,correct_answer\n');
   assert.equal(call('create-user.js', { ...session, sessionId: 'stale-session' }).statusCode, 400);
   const changed = study.readStudy();
   assert.equal(call('create-user.js', { ...session, sessionId: 'stale-version', videoOrder: changed.videos }).statusCode, 409);
   const retry = call('create-user.js', { ...session, videoOrder: changed.videos });
   assert.equal(retry.statusCode, 200);
   assert.equal(retry.body.settings.mode, 'both');
+  assert.equal(retry.body.settings.backgroundColor, '#234567');
   assert.deepEqual(retry.body.videoOrder, manifest.videos);
   assert.equal(retry.body.questions['a_vmaf_80.mp4'].length, 2);
   assert.equal(call('update-end-time.js', { sessionId: session.sessionId }).statusCode, 409);
   assert.throws(() => configuration.validateConfig({ ...initial, selectedVideos: ['missing.mp4'] }, filenames));
   assert.throws(() => configuration.validateConfig({ ...initial, sliderStep: 0.03 }, filenames));
+  for (const backgroundColor of ['red', '#fff', '#1234567', 'var(--background)', 123]) {
+    assert.throws(() => configuration.validateConfig({ ...initial, backgroundColor }, filenames), /kolor tła/);
+  }
   configuration.writeConfiguration({ ...initial, selectedVideos: ['missing.mp4'] }, csv);
   assert.ok(configuration.readConfiguration().settings);
   assert.throws(() => study.readStudy(), /nie jest już dostępny/);
@@ -227,12 +232,14 @@ test('balanced starts alternate 50/50 per version; retries, failed starts and la
 
 test('older configurations and snapshots keep their order and gain both localized transition instructions', () => {
   const older = configuration.defaults();
-  delete older.phaseOrder; older.selectedVideos = ['b clip.mp4'];
+  delete older.phaseOrder; delete older.backgroundColor; older.selectedVideos = ['b clip.mp4'];
   for (const locale of ['pl', 'en']) {
     delete older.texts[locale].standard_part_two; delete older.texts[locale].standard_instruction;
   }
   const normalized = configuration.validateConfig(older, older.selectedVideos);
   assert.equal(normalized.phaseOrder, 'standard-first');
+  assert.equal(normalized.backgroundColor, '#111827');
+  assert.equal(configuration.sessionSettings({ settings_snapshot: JSON.stringify(older) }).backgroundColor, '#111827');
   assert.ok(normalized.texts.pl.standard_instruction);
   assert.ok(normalized.texts.en.standard_instruction);
   assert.deepEqual(configuration.phases(configuration.sessionSettings({ settings_snapshot: JSON.stringify(older) })), ['standard', 'slider']);

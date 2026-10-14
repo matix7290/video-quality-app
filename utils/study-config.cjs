@@ -27,7 +27,7 @@ function defaults() {
   return {
     title: 'Badanie jakości wideo', mode: 'both', phaseOrder: 'standard-first', selectedVideos: null,
     randomize: true, screenTest: true, autoFullscreen: false, sliderStep: 0.01,
-    stimulusType: 'video', imageDuration: 5,
+    stimulusType: 'video', imageDuration: 5, backgroundColor: '#111827',
     texts: Object.fromEntries(Object.entries(dictionaries).map(([locale, dictionary]) => [locale,
       Object.fromEntries(TEXT_KEYS.map(key => [key, dictionary[key]]))])),
     labels: Object.fromEntries(Object.entries(dictionaries).map(([locale, dictionary]) => [locale, LABEL_KEYS.map(key => dictionary[key])])),
@@ -53,6 +53,10 @@ function validateConfig(input, filenames, { allowEmptySelection = false } = {}) 
   if (typeof imageDuration !== 'number' || !Number.isFinite(imageDuration) || imageDuration < 0.5 || imageDuration > 300 ||
       Math.abs(imageDuration * 10 - Math.round(imageDuration * 10)) > 1e-7) throw new Error('Czas wyświetlania zdjęcia musi wynosić od 0,5 do 300 sekund, z krokiem 0,1.');
   settings.imageDuration = imageDuration;
+  if (input.backgroundColor !== undefined && (typeof input.backgroundColor !== 'string' || !/^#[0-9a-fA-F]{6}$/.test(input.backgroundColor))) {
+    throw new Error('Nieprawidłowy kolor tła strony testu.');
+  }
+  settings.backgroundColor = input.backgroundColor ?? settings.backgroundColor;
   if (!['both', 'standard', 'slider'].includes(input.mode)) throw new Error('Nieprawidłowy typ badania.');
   settings.mode = input.mode;
   if (!['standard-first', 'slider-first', 'balanced'].includes(input.phaseOrder ?? 'standard-first')) throw new Error('Nieprawidłowa kolejność skal.');
@@ -110,6 +114,7 @@ function sessionSettings(user) {
   const settings = user.settings_snapshot ? JSON.parse(user.settings_snapshot) : { ...defaults(), version: 'legacy' };
   // Previously the participant's choice was stored only in the user record.
   return { ...settings, stimulusType: settings.stimulusType ?? 'video', imageDuration: settings.imageDuration ?? 5,
+    backgroundColor: settings.backgroundColor ?? defaults().backgroundColor,
     autoFullscreen: user.settings_snapshot && typeof settings.autoFullscreen === 'boolean' ? settings.autoFullscreen : !!user.auto_fullscreen };
 }
 module.exports = { defaults, catalog, validateConfig, readConfiguration, phases, versionOf, writeConfiguration, sessionSettings, TEXT_KEYS, studyRevision };
